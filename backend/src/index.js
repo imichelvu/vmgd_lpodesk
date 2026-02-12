@@ -1,0 +1,81 @@
+import './loadEnv.js';
+import express from 'express';
+import cors from 'cors';
+import pool from './db/pool.js';
+import authRoutes from './routes/auth.js';
+import leaveRoutes from './routes/leave.js';
+import usersRoutes from './routes/users.js';
+import delegationsRoutes from './routes/delegations.js';
+
+const app = express();
+const PORT = process.env.PORT || 4000;
+const startTime = Date.now();
+
+app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }));
+app.use(express.json());
+
+app.use('/api/auth', authRoutes);
+app.use('/api/leave', leaveRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/delegations', delegationsRoutes);
+
+app.get('/', (_, res) => {
+  res.type('html').send(`
+    <!DOCTYPE html>
+    <html>
+      <head><title>VMGD Leave API</title></head>
+      <body style="font-family: system-ui; padding: 2rem;">
+        <h1>VMGD Leave API</h1>
+        <p>Backend is running. Use the frontend app to sign in.</p>
+        <ul>
+          <li><a href="/api/health">Health check</a> (JSON)</li>
+          <li><a href="/api/troubleshoot">Troubleshoot</a> (JSON)</li>
+          <li><a href="http://localhost:5173">Open frontend (localhost:5173)</a></li>
+        </ul>
+      </body>
+    </html>
+  `);
+});
+app.get('/api/health', (_, res) => res.json({ ok: true }));
+
+app.get('/api/troubleshoot', async (_, res) => {
+  const out = {
+    ok: true,
+    backend: 'running',
+    uptime_seconds: Math.floor((Date.now() - startTime) / 1000),
+    env: {
+      DATABASE_URL_set: !!(process.env.DATABASE_URL && process.env.DATABASE_URL.trim()),
+      JWT_SECRET_set: !!(process.env.JWT_SECRET && String(process.env.JWT_SECRET).trim()),
+      PORT: process.env.PORT || 4000,
+    },
+    database: { connected: false, error: null },
+  };
+  try {
+    const client = await pool.connect();
+    await client.query('SELECT 1');
+    client.release();
+    out.database = { connected: true, error: null };
+  } catch (err) {
+    out.ok = false;
+    out.database = { connected: false, error: err.message || String(err) };
+  }
+  res.json(out);
+});
+
+app.use((err, req, res, next) => {
+  console.error('Error:', err.message || err);
+  if (err.stack) console.error(err.stack);
+  if (res.headersSent) return next(err);
+  const message = process.env.NODE_ENV === 'production' ? 'Internal server error' : (err.message || 'Internal server error');
+  res.status(500).json({ error: message });
+});
+
+const HOST = process.env.HOST || '127.0.0.1';
+app.listen(PORT, HOST, () => {
+  console.log(`VMGD Leave API running on http://${HOST}:${PORT}`);
+  const hasDb = !!process.env.DATABASE_URL;
+  const hasJwt = !!(process.env.JWT_SECRET && String(process.env.JWT_SECRET).trim());
+  if (!hasDb) console.warn('WARN: DATABASE_URL is not set');
+  if (!hasJwt) console.warn('WARN: JWT_SECRET is not set — login will fail');
+  if (hasDb && hasJwt) console.log('Env OK: DATABASE_URL and JWT_SECRET set');
+});

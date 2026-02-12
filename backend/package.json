@@ -1,0 +1,24 @@
+{
+  "name": "vmgd-leave-backend",
+  "version": "1.0.0",
+  "description": "VMGD Online Leave System - Backend",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "db:migrate": "node src/db/migrate.js",
+    "db:seed": "node src/db/seed.js",
+    "db:add-username": "node src/db/migrate-username.js",
+    "test:smtp": "node src/scripts/testSmtp.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^6.9.14",
+    "pg": "^8.12.0"
+  }
+}

@@ -1,0 +1,246 @@
+<style>
+:root {
+    --top-offset: 15px; /* Change this one value to adjust everything */
+}
+
+.pscformtext{
+	color:blue;
+	z-index:100;
+    position:  absolute;    
+    font-size:14px;
+    font-weight:bold;
+}
+#image-container
+{
+    width: 800px;
+    position:relative;
+
+
+}
+
+#image
+{    
+    position:absolute;
+    left:0;
+    top:0;
+}
+#fullname
+{
+    left:290px;
+    top: calc(80px - var(--top-offset));
+}
+#vnpfno
+{
+    left:660px;
+    top: calc(80px - var(--top-offset));
+}
+
+#postitle
+{
+    left:200px;
+    top: calc(110px - var(--top-offset));
+}
+
+#posno
+{
+    left:200px;
+    top: calc(150px - var(--top-offset));
+}
+#grade
+{
+    left:600px;
+    top: calc(150px - var(--top-offset));
+}
+#department
+{
+    left:230px;
+    top: calc(180px - var(--top-offset));
+}
+#ministry
+{
+    left:620px;
+    top: calc(180px - var(--top-offset));
+}
+#entrydate
+{
+    left:340px;
+    top: calc(220px - var(--top-offset));
+}
+
+#leavetype
+{
+    left:400px;
+    top: calc(250px - var(--top-offset));
+}
+#leavedest
+{
+    left:400px;
+    top: calc(290px - var(--top-offset));
+}
+
+#firstleavedt
+{
+    left:300px;
+    top: calc(320px - var(--top-offset));
+}
+
+#lastleavedt
+{
+    left:600px;
+    top: calc(320px - var(--top-offset));
+}
+#totalnumleave
+{
+    left:480px;
+    top: calc(350px - var(--top-offset));
+}
+#staffsig{
+    left: 315px;
+    top: calc(390px - var(--top-offset));
+}
+
+#staffsigdt
+{
+   
+    left:660px;
+    top: calc(430px - var(--top-offset));
+}
+
+#supsig
+{
+     left:660px;
+    top: calc(495px - var(--top-offset));
+}
+
+
+#supsigdt
+{
+     left:660px;
+    top: calc(495px - var(--top-offset));
+}
+
+#advance .yes
+{
+    left:375px;
+    top: calc(365px - var(--top-offset));
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    font-size: 10px;
+    color: #fff;
+    line-height: 50px;
+    text-align: center;
+    border: 5px solid blue;
+  
+
+}
+
+#advance .no
+{
+    left:425px;
+    top: calc(365px - var(--top-offset));
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    font-size: 10px;
+    color: #fff;
+    line-height: 50px;
+    text-align: center;
+    border: 5px solid blue;
+  
+
+}
+#stafinfo{
+    padding-bottom: 20px;
+    border-bottom: 1px dotted red;
+    border-top: 1px dotted red;
+}
+
+option{
+    color:white !important;
+    padding:2px;
+    font-weight: bold
+}
+
+select option:first-child {
+    color: red; 
+    background: yellow;
+}
+
+select{
+    margin:40px;
+    background: rgba(0,0,0,0.3);
+    color:white;
+    text-shadow:0 1px 0 rgba(0,0,0,0.4);
+    padding: 5px;
+}
+
+#logout:hover{
+    color:black !important;
+    background-color: green !important;
+
+}
+
+#editbtn{
+    margin-top: 10px;
+}
+
+
+/*EDIT STAFF CSS CORNER */
+
+.modal-header{
+    background: linear-gradient(grey,white,grey);
+}
+.modal-content{
+    background-color: background-color !important;
+}
+
+//PAGES SIZE start
+
+page {
+  background: white;
+  display: block;
+  margin: 0 auto;
+  margin-bottom: 0.5cm;
+  box-shadow: 0 0 0.5cm rgba(0,0,0,0.5);
+  border: 1px solid red;
+}
+
+page[size="A3"][layout="portrait"] {
+  width: 42cm;
+  height: 29.7cm;  
+}
+
+@media print {
+  body, page {
+    margin: 0;
+    box-shadow: 0;
+  }
+}
+//PAGES SIZE end
+
+</style>
+<div id="image-container">
+     
+    <img id="image" style="height:1000px;width:800px" src="./form4-9.png"> <!--FORM -->
+		    <!--TEXT ON FORM -->
+		    <p class="pscformtext statinfo" id="fullname">Igor Michel</p>
+		    <p class="pscformtext statinfo" id="vnpfno">1079907</p>
+		    <p class="pscformtext statinfo" id="postitle">Database Application Officer</p>
+		    <p class="pscformtext statinfo" id="posno">6867</p>
+		    <p class="pscformtext statinfo" id="grade">HOs 4.1</p>
+		    <p class="pscformtext statinfo" id="department">VMGD</p>
+		    <p class="pscformtext statinfo" id="ministry">MOCCA</p>
+		    <p class="pscformtext statinfo" id="entrydate">01 Sep 2014</p>
+		    <p class="pscformtext" id="leavetype">Admin Leave</p>
+		    <p class="pscformtext" id="leavedest">Port-Vila</p>
+		    <p class="pscformtext" id="firstleavedt">13 Feb 2026</p>
+		    <p class="pscformtext" id="lastleavedt">16 Feb 2026</p>		   
+		    <p class="pscformtext" id="totalnumleave">2</p>
+		    <p class="pscformtext" id="advance" style="left: 425px; top: 365px; width: 50px; height: 50px; border-radius: 50%; font-size: 10px; color: rgb(255, 255, 255); line-height: 50px; text-align: center; border: 5px solid blue;"></p>
+		    <p class="pscformtext" id="staffsig"><img height="96px" width="96px" src="/leave/images/signatures/1079907_blue.png"></p>
+		    <p class="pscformtext" id="staffsigdt">12 Feb 2026</p>
+		    <p class="pscformtext" id="supsig"></p>
+		    <p class="pscformtext" id="supsigdt"></p>
+		    
+			</div>

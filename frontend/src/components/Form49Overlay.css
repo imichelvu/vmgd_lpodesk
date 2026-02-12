@@ -1,0 +1,89 @@
+/**
+ * Form 4-9 overlay preview – form image + positioned text (from overlay.html).
+ * Tweak --top-offset and field positions here; IDs match overlay.html.
+ */
+
+.form49-overlay-preview {
+  --top-offset: 15px;
+  width: 100%;
+  max-width: 800px;
+}
+
+.form49-overlay-preview .form49-overlay-container {
+  width: 800px;
+  position: relative;
+  max-width: 100%;
+}
+
+.form49-overlay-preview .form49-overlay-img {
+  display: block;
+  width: 800px;
+  height: auto;
+  max-width: 100%;
+  vertical-align: top;
+}
+
+.form49-overlay-preview .pscformtext {
+  color: #0078d4;
+  z-index: 100;
+  position: absolute;
+  font-size: 14px;
+  font-weight: bold;
+  margin: 0;
+  pointer-events: none;
+}
+
+.form49-overlay-preview #fullname { left: 290px; top: calc(80px - var(--top-offset)); }
+.form49-overlay-preview #vnpfno { left: 660px; top: calc(80px - var(--top-offset)); }
+.form49-overlay-preview #postitle { left: 200px; top: calc(110px - var(--top-offset)); }
+.form49-overlay-preview #posno { left: 200px; top: calc(150px - var(--top-offset)); }
+.form49-overlay-preview #grade { left: 600px; top: calc(150px - var(--top-offset)); }
+.form49-overlay-preview #department { left: 230px; top: calc(180px - var(--top-offset)); }
+.form49-overlay-preview #ministry { left: 620px; top: calc(180px - var(--top-offset)); }
+.form49-overlay-preview #entrydate { left: 340px; top: calc(220px - var(--top-offset)); }
+.form49-overlay-preview #leavetype { left: 400px; top: calc(250px - var(--top-offset)); }
+.form49-overlay-preview #leavedest { left: 400px; top: calc(290px - var(--top-offset)); }
+.form49-overlay-preview #firstleavedt { left: 300px; top: calc(320px - var(--top-offset)); }
+.form49-overlay-preview #lastleavedt { left: 600px; top: calc(320px - var(--top-offset)); }
+.form49-overlay-preview #totalnumleave { left: 480px; top: calc(350px - var(--top-offset)); }
+.form49-overlay-preview #staffsig { left: 315px; top: calc(390px - var(--top-offset)); }
+.form49-overlay-preview #staffsigdt { left: 660px; top: calc(430px - var(--top-offset)); }
+.form49-overlay-preview #supsig { left: 660px; top: calc(495px - var(--top-offset)); }
+.form49-overlay-preview #supsigdt { left: 660px; top: calc(495px - var(--top-offset)); }
+
+.form49-overlay-preview #advance {
+  left: 375px;
+  top: calc(365px - var(--top-offset));
+  width: auto;
+  height: auto;
+  border: none;
+  font-size: 14px;
+  color: #0078d4;
+  line-height: 1.2;
+  padding: 0;
+}
+
+.form49-overlay-preview #advance .yes,
+.form49-overlay-preview #advance .no {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  font-size: 10px;
+  color: #fff;
+  line-height: 50px;
+  text-align: center;
+  border: 5px solid #0078d4;
+}
+
+.form49-overlay-preview #advance .yes { left: 0; top: 0; }
+.form49-overlay-preview #advance .no { left: 50px; top: 0; }
+
+.form49-overlay-preview .form49-overlay-sig-img {
+  display: block;
+  max-height: 96px;
+  max-width: 180px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
