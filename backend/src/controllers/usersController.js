@@ -5,7 +5,7 @@ import { ROLE_IDS } from '../constants/roles.js';
 
 export async function list(req, res) {
   const { rows } = await pool.query(
-    `SELECT u.id, u.full_name, u.username, u.email, u.vnpf_no, u.post_title, u.post_no, u.grade, u.entry_date, u.division_id, u.reports_to_id,
+    `SELECT u.id, u.full_name, u.username, u.email, u.vnpf_no, u.post_title, u.post_no, u.grade, u.department, u.ministry, u.entry_date, u.division_id, u.reports_to_id,
             d.name as division_name,
             array_agg(ur.role_id) FILTER (WHERE ur.role_id IS NOT NULL) as role_ids
      FROM users u
@@ -20,7 +20,7 @@ export async function list(req, res) {
 export async function getById(req, res) {
   const { id } = req.params;
   const { rows } = await pool.query(
-    `SELECT u.id, u.full_name, u.username, u.email, u.vnpf_no, u.post_title, u.post_no, u.grade, u.entry_date, u.division_id, u.reports_to_id,
+    `SELECT u.id, u.full_name, u.username, u.email, u.vnpf_no, u.post_title, u.post_no, u.grade, u.department, u.ministry, u.entry_date, u.division_id, u.reports_to_id,
             d.name as division_name,
             array_agg(ur.role_id) FILTER (WHERE ur.role_id IS NOT NULL) as role_ids
      FROM users u
@@ -36,7 +36,7 @@ export async function getById(req, res) {
 }
 
 export async function create(req, res) {
-  const { full_name, username, email, password, vnpf_no, post_title, post_no, grade, entry_date, division_id, reports_to_id, role_ids } = req.body;
+  const { full_name, username, email, password, vnpf_no, post_title, post_no, grade, department, ministry, entry_date, division_id, reports_to_id, role_ids } = req.body;
   if (!full_name || !email || !password) {
     return res.status(400).json({ error: 'full_name, email, password required' });
   }
@@ -48,10 +48,10 @@ export async function create(req, res) {
   const password_hash = await bcrypt.hash(password, 10);
   const entryDateVal = entry_date && String(entry_date).trim() ? String(entry_date).trim() : null;
   const { rows } = await pool.query(
-    `INSERT INTO users (full_name, username, email, password_hash, vnpf_no, post_title, post_no, grade, entry_date, division_id, reports_to_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-     RETURNING id, full_name, username, email, vnpf_no, post_title, post_no, grade, entry_date, division_id, reports_to_id, created_at`,
-    [full_name, usernameVal, email, password_hash, vnpf_no || null, post_title || null, post_no || null, grade || null, entryDateVal, division_id || null, reports_to_id || null]
+    `INSERT INTO users (full_name, username, email, password_hash, vnpf_no, post_title, post_no, grade, department, ministry, entry_date, division_id, reports_to_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+     RETURNING id, full_name, username, email, vnpf_no, post_title, post_no, grade, department, ministry, entry_date, division_id, reports_to_id, created_at`,
+    [full_name, usernameVal, email, password_hash, vnpf_no || null, post_title || null, post_no || null, grade || null, department || null, ministry || null, entryDateVal, division_id || null, reports_to_id || null]
   );
   const user = rows[0];
   const rids = Array.isArray(role_ids) ? role_ids : (role_ids ? [role_ids] : [ROLE_IDS.Staff]);
@@ -68,7 +68,7 @@ export async function create(req, res) {
 
 export async function update(req, res) {
   const { id } = req.params;
-  const { full_name, username, email, password, vnpf_no, post_title, post_no, grade, entry_date, division_id, reports_to_id, role_ids } = req.body;
+  const { full_name, username, email, password, vnpf_no, post_title, post_no, grade, department, ministry, entry_date, division_id, reports_to_id, role_ids } = req.body;
   const usernameVal = username !== undefined ? (username ? String(username).trim().toLowerCase() || null : null) : undefined;
   if (usernameVal !== undefined && usernameVal) {
     const { rows: existing } = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1) AND id != $2', [usernameVal, id]);
@@ -95,6 +95,8 @@ export async function update(req, res) {
   if (post_title !== undefined) { updates.push(`post_title = $${i++}`); values.push(post_title); }
   if (post_no !== undefined) { updates.push(`post_no = $${i++}`); values.push(post_no); }
   if (grade !== undefined) { updates.push(`grade = $${i++}`); values.push(grade); }
+  if (department !== undefined) { updates.push(`department = $${i++}`); values.push(department && String(department).trim() ? String(department).trim() : null); }
+  if (ministry !== undefined) { updates.push(`ministry = $${i++}`); values.push(ministry && String(ministry).trim() ? String(ministry).trim() : null); }
   if (entry_date !== undefined) { updates.push(`entry_date = $${i++}`); values.push(entry_date && String(entry_date).trim() ? String(entry_date).trim() : null); }
   if (division_id !== undefined) { updates.push(`division_id = $${i++}`); values.push(division_id); }
   if (reports_to_id !== undefined) { updates.push(`reports_to_id = $${i++}`); values.push(reports_to_id); }
@@ -109,7 +111,7 @@ export async function update(req, res) {
     }
   }
   const { rows } = await pool.query(
-    `SELECT u.id, u.full_name, u.username, u.email, u.vnpf_no, u.post_title, u.post_no, u.grade, u.entry_date, u.division_id, u.reports_to_id,
+    `SELECT u.id, u.full_name, u.username, u.email, u.vnpf_no, u.post_title, u.post_no, u.grade, u.department, u.ministry, u.entry_date, u.division_id, u.reports_to_id,
             array_agg(ur.role_id) FILTER (WHERE ur.role_id IS NOT NULL) as role_ids
      FROM users u LEFT JOIN user_roles ur ON u.id = ur.user_id WHERE u.id = $1 GROUP BY u.id`,
     [id]

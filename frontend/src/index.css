@@ -232,6 +232,9 @@ button:disabled {
   transform: translateY(2px);
 }
 
+/* ========== Form 4-9 overlay preview (from overlay.html) ========== */
+
+
 /* ========== Form 4-9 as HTML (exact layout, no budge) ========== */
 /* Staff & leave row IDs for manual position tweaks (target inside .form49-doc):
    #form49-name, #form49-post-title, #form49-post-no, #form49-department,

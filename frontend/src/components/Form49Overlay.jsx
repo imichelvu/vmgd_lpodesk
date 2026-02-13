@@ -36,8 +36,8 @@ export default function Form49Overlay({ user, formData }) {
   const postitle = user?.post_title || '';
   const posno = user?.post_no || '';
   const grade = user?.grade || '';
-  const department = user?.division_name || '';
-  const ministry = user?.ministry || '';
+  const department = user?.department || 'VMGD';
+  const ministry = user?.ministry || 'MoCCA';
   const entrydate = user?.entry_date ? formatDDMMMYYYY(user.entry_date) : '';
   const leavetype = formData?.leave_type || '';
   const leavedest = formData?.destination || '';
@@ -45,6 +45,7 @@ export default function Form49Overlay({ user, formData }) {
   const lastleavedt = formatDDMMMYYYY(formData?.end_date || '');
   const totalnumleave = formData?.total_working_days != null ? String(formData.total_working_days) : '';
   const advancePay = formData?.advance_pay;
+  const advancePayDate = formData?.advance_pay_date ? formatDDMMMYYYY(formData.advance_pay_date) : '';
   const signatureData = formData?.signature_data;
   const hasSignature = typeof signatureData === 'string' && signatureData.startsWith('data:');
   const staffsigdt = hasSignature ? formatDDMMMYYYY(new Date().toISOString().slice(0, 10)) : '';
@@ -75,6 +76,7 @@ export default function Form49Overlay({ user, formData }) {
           {advancePay ? <span className="yes">YES</span> : null}
           {!advancePay && advancePay !== undefined ? <span className="no">NO</span> : null}
         </div>
+        <p className="pscformtext" id="advance-pay-date">{advancePayDate}</p>
         <p className="pscformtext" id="staffsig">
           {hasSignature ? (
             <img src={signatureData} alt="Signature" className="form49-overlay-sig-img" />

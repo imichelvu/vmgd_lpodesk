@@ -25,14 +25,14 @@ export async function login(req, res, next) {
     }
     const { rows } = await pool.query(
       `SELECT u.id, u.username, u.email, u.password_hash, u.full_name, u.division_id, u.reports_to_id,
-              u.vnpf_no, u.post_title, u.post_no, u.grade, u.entry_date,
+              u.vnpf_no, u.post_title, u.post_no, u.grade, u.department, u.ministry, u.entry_date,
               d.name as division_name,
               array_agg(ur.role_id) FILTER (WHERE ur.role_id IS NOT NULL) as role_ids
        FROM users u
        LEFT JOIN user_roles ur ON u.id = ur.user_id
        LEFT JOIN divisions d ON d.id = u.division_id
        WHERE LOWER(u.email) = LOWER($1) OR LOWER(u.username) = LOWER($1)
-       GROUP BY u.id, u.full_name, u.username, u.email, u.division_id, u.reports_to_id, u.vnpf_no, u.post_title, u.post_no, u.grade, u.entry_date, d.name`,
+       GROUP BY u.id, u.full_name, u.username, u.email, u.division_id, u.reports_to_id, u.vnpf_no, u.post_title, u.post_no, u.grade, u.department, u.ministry, u.entry_date, d.name`,
       [loginId]
     );
     const user = rows[0];
@@ -76,6 +76,8 @@ export async function login(req, res, next) {
         post_title: user.post_title ?? '',
         post_no: user.post_no ?? '',
         grade: user.grade ?? '',
+        department: user.department ?? '',
+        ministry: user.ministry ?? '',
         entry_date: formatEntryDateForApi(user.entry_date),
         division_name: user.division_name ?? '',
         role_ids: roleIds,
@@ -100,6 +102,8 @@ export async function me(req, res) {
     post_title: u.post_title ?? '',
     post_no: u.post_no ?? '',
     grade: u.grade ?? '',
+    department: u.department ?? '',
+    ministry: u.ministry ?? '',
     entry_date: formatEntryDateForApi(u.entry_date),
     division_name: u.division_name ?? '',
     role_ids: u.role_ids || [],

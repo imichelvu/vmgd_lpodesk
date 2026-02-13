@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS users (
   post_title VARCHAR(255),
   post_no VARCHAR(50),
   grade VARCHAR(50),
+  department VARCHAR(255),
+  ministry VARCHAR(255),
   entry_date DATE,
   division_id INTEGER REFERENCES divisions(id),
   reports_to_id INTEGER REFERENCES users(id),

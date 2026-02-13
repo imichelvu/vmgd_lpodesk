@@ -10,6 +10,8 @@ const emptyUserForm = (defaultRoleId) => ({
   post_title: '',
   post_no: '',
   grade: '',
+  department: '',
+  ministry: '',
   entry_date: '',
   division_id: '',
   reports_to_id: '',
@@ -67,6 +69,8 @@ export default function AdminView() {
           post_title: f.post_title || null,
           post_no: f.post_no || null,
           grade: f.grade || null,
+          department: f.department?.trim() || null,
+          ministry: f.ministry?.trim() || null,
           entry_date: f.entry_date?.trim() || null,
           division_id: f.division_id ? parseInt(f.division_id, 10) : null,
           reports_to_id: f.reports_to_id ? parseInt(f.reports_to_id, 10) : null,
@@ -100,6 +104,8 @@ export default function AdminView() {
         post_title: f.post_title || null,
         post_no: f.post_no || null,
         grade: f.grade || null,
+        department: f.department?.trim() || null,
+        ministry: f.ministry?.trim() || null,
         entry_date: f.entry_date?.trim() || null,
         division_id: f.division_id ? parseInt(f.division_id, 10) : null,
         reports_to_id: f.reports_to_id ? parseInt(f.reports_to_id, 10) : null,
@@ -138,6 +144,8 @@ export default function AdminView() {
       post_title: u.post_title || '',
       post_no: u.post_no || '',
       grade: u.grade || '',
+      department: u.department ?? '',
+      ministry: u.ministry ?? '',
       entry_date: u.entry_date ? String(u.entry_date).slice(0, 10) : '',
       division_id: u.division_id ?? '',
       reports_to_id: u.reports_to_id ?? '',
@@ -337,6 +345,21 @@ export default function AdminView() {
                     <input
                       value={userForm.grade}
                       onChange={(e) => setUserForm((f) => ({ ...f, grade: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Department</label>
+                    <input
+                      value={userForm.department}
+                      onChange={(e) => setUserForm((f) => ({ ...f, department: e.target.value }))}
+                      placeholder="e.g. VMGD"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Ministry</label>
+                    <input
+                      value={userForm.ministry}
+                      onChange={(e) => setUserForm((f) => ({ ...f, ministry: e.target.value }))}
                     />
                   </div>
                   <div className="form-group">

@@ -40,7 +40,7 @@ export default function Form49Html({ user, formData }) {
   const vnpfNo = user?.vnpf_no || '';
   const postNo = user?.post_no || '';
   const grade = user?.grade || '';
-  const department = user?.division_name || '';
+  const department = user?.department || '';
   const ministry = user?.ministry || '';
   const entryDate = user?.entry_date ? formatEntryDate(user.entry_date) : '';
   const leaveType = formData?.leave_type || '';

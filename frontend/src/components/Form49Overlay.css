@@ -35,33 +35,23 @@
 
 .form49-overlay-preview #fullname { left: 290px; top: calc(80px - var(--top-offset)); }
 .form49-overlay-preview #vnpfno { left: 660px; top: calc(80px - var(--top-offset)); }
-.form49-overlay-preview #postitle { left: 200px; top: calc(110px - var(--top-offset)); }
-.form49-overlay-preview #posno { left: 200px; top: calc(150px - var(--top-offset)); }
-.form49-overlay-preview #grade { left: 600px; top: calc(150px - var(--top-offset)); }
+.form49-overlay-preview #postitle { left: 200px; top: 130px; }
+.form49-overlay-preview #posno { left: 200px; top: 170px }
+.form49-overlay-preview #grade { left: 600px; top: 170px }
 .form49-overlay-preview #department { left: 230px; top: 210px; }
-.form49-overlay-preview #ministry { left: 620px; top: calc(180px - var(--top-offset)); }
+.form49-overlay-preview #ministry { left: 620px; top: 210px }
 .form49-overlay-preview #entrydate { left: 340px; top: 250px; }
-.form49-overlay-preview #leavetype { left: 400px; top: calc(250px - var(--top-offset)); }
-.form49-overlay-preview #leavedest { left: 400px; top: calc(290px - var(--top-offset)); }
+.form49-overlay-preview #leavetype { left: 360px; top: 290px; }
+.form49-overlay-preview #leavedest { left: 400px; top: 290px; }
 .form49-overlay-preview #firstleavedt { left: 300px; top: 370px }
 .form49-overlay-preview #lastleavedt { left: 600px; top: 370px }
-.form49-overlay-preview #totalnumleave { left: 480px; top: 290px; }
+.form49-overlay-preview #totalnumleave { left: 480px; top: 400px; }
 .form49-overlay-preview #staffsig { left: 315px; top: calc(390px - var(--top-offset)); }
 .form49-overlay-preview #staffsigdt { left: 660px; top: calc(430px - var(--top-offset)); }
 .form49-overlay-preview #supsig { left: 660px; top: calc(495px - var(--top-offset)); }
 .form49-overlay-preview #supsigdt { left: 660px; top: calc(495px - var(--top-offset)); }
+.form49-overlay-preview #advance-pay-date { left: 600px; top: 435px; }
 
-.form49-overlay-preview #advance {
-  left: 375px;
-  top: 430px;
-  width: auto;
-  height: auto;
-  border: none;
-  font-size: 14px;
-  color: #0078d4;
-  line-height: 1.2;
-  padding: 0;
-}
 
 .form49-overlay-preview #advance .yes,
 .form49-overlay-preview #advance .no {
