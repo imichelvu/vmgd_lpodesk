@@ -4,7 +4,7 @@
  */
 
 .form49-overlay-preview {
-  --top-offset: 15px;
+  --top-offset: -13px;
   width: 100%;
   max-width: 800px;
 }
@@ -38,14 +38,14 @@
 .form49-overlay-preview #postitle { left: 200px; top: calc(110px - var(--top-offset)); }
 .form49-overlay-preview #posno { left: 200px; top: calc(150px - var(--top-offset)); }
 .form49-overlay-preview #grade { left: 600px; top: calc(150px - var(--top-offset)); }
-.form49-overlay-preview #department { left: 230px; top: calc(180px - var(--top-offset)); }
+.form49-overlay-preview #department { left: 230px; top: 210px; }
 .form49-overlay-preview #ministry { left: 620px; top: calc(180px - var(--top-offset)); }
-.form49-overlay-preview #entrydate { left: 340px; top: calc(220px - var(--top-offset)); }
+.form49-overlay-preview #entrydate { left: 340px; top: 250px; }
 .form49-overlay-preview #leavetype { left: 400px; top: calc(250px - var(--top-offset)); }
 .form49-overlay-preview #leavedest { left: 400px; top: calc(290px - var(--top-offset)); }
-.form49-overlay-preview #firstleavedt { left: 300px; top: calc(320px - var(--top-offset)); }
-.form49-overlay-preview #lastleavedt { left: 600px; top: calc(320px - var(--top-offset)); }
-.form49-overlay-preview #totalnumleave { left: 480px; top: calc(350px - var(--top-offset)); }
+.form49-overlay-preview #firstleavedt { left: 300px; top: 370px }
+.form49-overlay-preview #lastleavedt { left: 600px; top: 370px }
+.form49-overlay-preview #totalnumleave { left: 480px; top: 290px; }
 .form49-overlay-preview #staffsig { left: 315px; top: calc(390px - var(--top-offset)); }
 .form49-overlay-preview #staffsigdt { left: 660px; top: calc(430px - var(--top-offset)); }
 .form49-overlay-preview #supsig { left: 660px; top: calc(495px - var(--top-offset)); }
@@ -53,7 +53,7 @@
 
 .form49-overlay-preview #advance {
   left: 375px;
-  top: calc(365px - var(--top-offset));
+  top: 430px;
   width: auto;
   height: auto;
   border: none;
@@ -66,8 +66,8 @@
 .form49-overlay-preview #advance .yes,
 .form49-overlay-preview #advance .no {
   position: absolute;
-  width: 50px;
-  height: 50px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   font-size: 10px;
   color: #fff;
@@ -87,3 +87,4 @@
   height: auto;
   object-fit: contain;
 }
+
