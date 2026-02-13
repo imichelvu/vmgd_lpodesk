@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # VMGD Online Leave System
 
 Leave Management System that replaces the manual **PSC Form 4-9**, built with React (frontend), Node.js/Express (backend), and PostgreSQL.
@@ -148,3 +149,7 @@ One user can have multiple roles via `user_roles`. The `checkRole` middleware al
 ## Notifications
 
 - Helper `notifyUser()` in `backend/src/helpers/notifications.js` creates an in-app notification and, if SMTP is configured in `.env`, sends an email to the next approver in the workflow.
+=======
+# vmgd_leavedesk
+VMGD Leave Application  Request App
+>>>>>>> 8b0832450ec85f6e2aaa1dd395ffa48b04373091
