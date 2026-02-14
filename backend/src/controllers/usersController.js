@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import nodemailer from 'nodemailer';
 import pool from '../db/pool.js';
 import { ROLE_IDS } from '../constants/roles.js';
