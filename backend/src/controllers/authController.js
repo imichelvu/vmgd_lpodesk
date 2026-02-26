@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import pool from '../db/pool.js';
+import { sendPasswordResetEmail } from '../helpers/notifications.js';
 
 /** Always return YYYY-MM-DD for auth response (pg may return Date object) */
 function formatEntryDateForApi(val) {
@@ -108,4 +110,77 @@ export async function me(req, res) {
     division_name: u.division_name ?? '',
     role_ids: u.role_ids || [],
   });
+}
+
+const RESET_TOKEN_EXPIRY_HOURS = 1;
+const APP_NAME = (process.env.APP_NAME || 'Leave Application').trim();
+
+/** POST /auth/forgot-password - body: { email }. Sends reset link to user's email if account exists. */
+export async function forgotPassword(req, res, next) {
+  try {
+    const email = (req.body?.email || '').trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'Valid email is required' });
+    }
+    const baseUrl = (process.env.APP_URL || process.env.FRONTEND_URL || '').replace(/\/$/, '');
+    if (!baseUrl) {
+      console.warn('APP_URL / FRONTEND_URL not set – password reset link may be wrong');
+    }
+    const { rows: users } = await pool.query(
+      'SELECT id, email FROM users WHERE LOWER(email) = $1',
+      [email]
+    );
+    const user = users[0];
+    if (user) {
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
+      await pool.query(
+        'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+        [user.id, token, expiresAt]
+      );
+      const resetLink = baseUrl ? `${baseUrl}/reset-password?token=${encodeURIComponent(token)}` : '';
+      if (resetLink) {
+        await sendPasswordResetEmail(user.email, resetLink, APP_NAME || 'Leave Application');
+      } else {
+        console.warn('Cannot send password reset email: no APP_URL/FRONTEND_URL');
+      }
+    }
+    res.status(200).json({
+      message: "If an account exists with that email, we've sent a password reset link. Please check your inbox.",
+    });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    next(err);
+  }
+}
+
+/** POST /auth/reset-password - body: { token, newPassword }. Validates token and sets new password. */
+export async function resetPassword(req, res, next) {
+  try {
+    const { token, newPassword } = req.body || {};
+    const rawToken = (token || '').trim();
+    const password = typeof newPassword === 'string' ? newPassword : '';
+    if (!rawToken || !password || password.length < 6) {
+      return res.status(400).json({ error: 'Token and a new password (at least 6 characters) are required' });
+    }
+    const { rows: tokens } = await pool.query(
+      'SELECT id, user_id, expires_at FROM password_reset_tokens WHERE token = $1',
+      [rawToken]
+    );
+    const row = tokens[0];
+    if (!row) {
+      return res.status(400).json({ error: 'Invalid or expired reset link. Please request a new one.' });
+    }
+    if (new Date(row.expires_at) < new Date()) {
+      await pool.query('DELETE FROM password_reset_tokens WHERE id = $1', [row.id]);
+      return res.status(400).json({ error: 'This reset link has expired. Please request a new one.' });
+    }
+    const passwordHash = await bcrypt.hash(password, 10);
+    await pool.query('UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [passwordHash, row.user_id]);
+    await pool.query('DELETE FROM password_reset_tokens WHERE token = $1', [rawToken]);
+    res.status(200).json({ message: 'Password has been reset. You can now sign in with your new password.' });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    next(err);
+  }
 }

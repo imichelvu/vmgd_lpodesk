@@ -43,6 +43,9 @@ export default function Form49Overlay({ user, formData }) {
   const leavedest = formData?.destination || '';
   const firstleavedt = formatDDMMMYYYY(formData?.start_date || '');
   const lastleavedt = formatDDMMMYYYY(formData?.end_date || '');
+  const isHalfDay = !!formData?.is_half_day;
+  const halfStart = formData?.half_day_time_start || '';
+  const halfEnd = formData?.half_day_time_end || '';
   const totalnumleave = formData?.total_working_days != null ? String(formData.total_working_days) : '';
   const advancePay = formData?.advance_pay;
   const advancePayDate = formData?.advance_pay_date ? formatDDMMMYYYY(formData.advance_pay_date) : '';
@@ -69,8 +72,12 @@ export default function Form49Overlay({ user, formData }) {
         <p className="pscformtext statinfo" id="entrydate">{entrydate}</p>
         <p className="pscformtext" id="leavetype">{leavetype}</p>
         <p className="pscformtext" id="leavedest">{leavedest}</p>
-        <p className="pscformtext" id="firstleavedt">{firstleavedt}</p>
-        <p className="pscformtext" id="lastleavedt">{lastleavedt}</p>
+        <p className="pscformtext" id="firstleavedt">
+          {isHalfDay && halfStart ? `${firstleavedt} ${halfStart}` : firstleavedt}
+        </p>
+        <p className="pscformtext" id="lastleavedt">
+          {isHalfDay && halfEnd ? `${lastleavedt} ${halfEnd}` : lastleavedt}
+        </p>
         <p className="pscformtext" id="totalnumleave">{totalnumleave}</p>
         <div id="advance" className="pscformtext form49-advance-wrap">
           {advancePay ? <span className="yes">YES</span> : null}

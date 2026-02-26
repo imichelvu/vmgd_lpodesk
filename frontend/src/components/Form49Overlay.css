@@ -42,12 +42,12 @@
 .form49-overlay-preview #ministry { left: 620px; top: 210px }
 .form49-overlay-preview #entrydate { left: 340px; top: 250px; }
 .form49-overlay-preview #leavetype { left: 360px; top: 290px; }
-.form49-overlay-preview #leavedest { left: 400px; top: 290px; }
-.form49-overlay-preview #firstleavedt { left: 300px; top: 370px }
-.form49-overlay-preview #lastleavedt { left: 600px; top: 370px }
+.form49-overlay-preview #leavedest { left: 450px; top: 330px; }
+.form49-overlay-preview #firstleavedt { left:275px; top: 370px }
+.form49-overlay-preview #lastleavedt { left: 580px; top: 370px }
 .form49-overlay-preview #totalnumleave { left: 480px; top: 400px; }
-.form49-overlay-preview #staffsig { left: 315px; top: calc(390px - var(--top-offset)); }
-.form49-overlay-preview #staffsigdt { left: 660px; top: calc(430px - var(--top-offset)); }
+.form49-overlay-preview #staffsig { left: 315px; top: calc(460px - var(--top-offset)); }
+.form49-overlay-preview #staffsigdt { left: 660px; top: calc(480px - var(--top-offset)); }
 .form49-overlay-preview #supsig { left: 660px; top: calc(495px - var(--top-offset)); }
 .form49-overlay-preview #supsigdt { left: 660px; top: calc(495px - var(--top-offset)); }
 .form49-overlay-preview #advance-pay-date { left: 600px; top: 435px; }
@@ -55,7 +55,7 @@
 
 .form49-overlay-preview #advance .yes,
 .form49-overlay-preview #advance .no {
-  position: absolute;
+    position: absolute;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -66,8 +66,8 @@
   border: 5px solid #0078d4;
 }
 
-.form49-overlay-preview #advance .yes { left: 0; top: 0; }
-.form49-overlay-preview #advance .no { left: 50px; top: 0; }
+.form49-overlay-preview #advance .yes { left: 375px; top: -725px;}
+.form49-overlay-preview #advance .no { left: 425px; top: -725px; }
 
 .form49-overlay-preview .form49-overlay-sig-img {
   display: block;
@@ -76,5 +76,6 @@
   width: auto;
   height: auto;
   object-fit: contain;
+  mix-blend-mode: multiply;
 }
 

@@ -27,7 +27,13 @@ export default function ApplicationDetail() {
     let cancelled = false;
     api(`/leave/${id}`)
       .then((r) => r.json())
-      .then((data) => { if (!cancelled) setApp(data); })
+      .then((data) => {
+        if (!cancelled) {
+          setApp(data);
+          const base = (import.meta.env.VITE_APP_NAME ?? '').trim();
+          document.title = base ? `Application #${id} · ${base}` : `Application #${id}`;
+        }
+      })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [id, api]);
@@ -76,15 +82,15 @@ export default function ApplicationDetail() {
 
   return (
     <>
-      <h2>Application #{app.id}</h2>
+      <p style={{ margin: '0 0 8px 0' }}>
+        <button type="button" className="nav-back" onClick={() => navigate('/')}>
+          ← Back to dashboard
+        </button>
+      </p>
+      <h2 style={{ marginTop: 0 }}>Application #{app.id}</h2>
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <span><strong>Status:</strong> {STATUS_LABELS[app.status] || app.status}</span>
-          {app.applicant_id === user?.id && (
-            <button type="button" className="btn btn-secondary" onClick={() => navigate('/')}>
-              Back to dashboard
-            </button>
-          )}
         </div>
       </div>
 

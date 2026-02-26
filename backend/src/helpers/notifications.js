@@ -95,6 +95,46 @@ function buildNotificationEmailHtml({ title, bodyText, viewUrl, appName }) {
 }
 
 /**
+ * Send password reset email with a link to the reset page.
+ * @param {string} toEmail - Recipient email
+ * @param {string} resetLink - Full URL to reset password (e.g. https://app.example.com/reset-password?token=xxx)
+ * @param {string} appName - Application name for the email
+ */
+export async function sendPasswordResetEmail(toEmail, resetLink, appName = 'Leave Application') {
+  const email = (toEmail || '').trim().toLowerCase();
+  if (!email) return;
+  const safeApp = escapeHtml(appName);
+  const safeLink = escapeHtml(resetLink);
+  const headerBg = '#1e3a5f';
+  const accent = '#2563eb';
+  const textColor = '#374151';
+  const mutedColor = '#6b7280';
+  const borderColor = '#e5e7eb';
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Reset your password</title></head>
+<body style="margin:0;padding:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:#f3f4f6;font-size:15px;line-height:1.5;color:${textColor};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:24px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.08);overflow:hidden;">
+        <tr><td style="background:${headerBg};color:#ffffff;padding:20px 24px;"><h1 style="margin:0;font-size:20px;font-weight:600;">${safeApp}</h1><p style="margin:6px 0 0;font-size:13px;opacity:0.9;">Password reset</p></td></tr>
+        <tr><td style="padding:28px 24px;">
+          <h2 style="margin:0 0 16px;font-size:17px;font-weight:600;color:${textColor};">Reset your password</h2>
+          <p style="margin:0 0 24px;color:${textColor};">You requested a password reset. Click the button below to set a new password. This link expires in 1 hour.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr><td><a href="${resetLink}" style="display:inline-block;background:${accent};color:#ffffff !important;padding:14px 28px;text-decoration:none;border-radius:6px;font-weight:600;font-size:15px;">Reset password</a></td></tr>
+          <tr><td style="padding:12px 0 0;font-size:13px;color:${mutedColor};">Or copy this link: <a href="${resetLink}" style="color:${accent};word-break:break-all;">${safeLink}</a></td></tr></table>
+        </td></tr>
+        <tr><td style="padding:16px 24px;border-top:1px solid ${borderColor};font-size:12px;color:${mutedColor};">This is an automated message from ${safeApp}. If you did not request this, you can ignore this email.</td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+  const text = `Reset your password\n\nYou requested a password reset for ${safeApp}. Open this link in your browser (valid for 1 hour):\n${resetLink}\n\nIf you did not request this, you can ignore this email.`;
+  await sendEmail({ toEmail: email, subject: `Reset your password – ${safeApp}`, text, html });
+}
+
+/**
  * Send email to the next person in the workflow chain.
  * @param {Object} options - { toEmail, subject, text, html }
  */

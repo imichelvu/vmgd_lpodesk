@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
+import SearchableSelect from '../components/SearchableSelect';
 
 const emptyUserForm = (defaultRoleId) => ({
   full_name: '',
@@ -26,25 +27,92 @@ export default function AdminView() {
   const [delegations, setDelegations] = useState([]);
   const [tab, setTab] = useState('users');
   const [userForm, setUserForm] = useState(null);
+  /** Single: { type: 'single', id, full_name }. Bulk: { type: 'bulk', count }. Same modal for both. */
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [delegForm, setDelegForm] = useState({ delegator_id: '', delegatee_id: '', start_date: '', end_date: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resendResult, setResendResult] = useState(null);
   const [resendLoading, setResendLoading] = useState(false);
+  const [adModalOpen, setAdModalOpen] = useState(false);
+  const [adUsername, setAdUsername] = useState('');
+  const [adPassword, setAdPassword] = useState('');
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
+  const [syncError, setSyncError] = useState('');
+  const [adFetchedUsers, setAdFetchedUsers] = useState([]);
+  const [adSelectedUsernames, setAdSelectedUsernames] = useState(new Set());
+  const [adSearchFilter, setAdSearchFilter] = useState('');
+  const [importLoading, setImportLoading] = useState(false);
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersLimit] = useState(20);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [allUsersForSelect, setAllUsersForSelect] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [divisionFilter, setDivisionFilter] = useState('');
+  const [selectedUserIds, setSelectedUserIds] = useState(new Set());
 
-  const loadUsers = () => request('/users').then(setUsers).catch(() => {});
+  const loadUsers = (page = usersPage, divisionIdOverride = undefined) => {
+    setUsersLoading(true);
+    const params = new URLSearchParams({ page: String(page), limit: String(usersLimit) });
+    const division = divisionIdOverride !== undefined ? divisionIdOverride : divisionFilter;
+    if (division) params.set('division_id', division);
+    return request(`/users?${params.toString()}`)
+      .then((data) => {
+        setUsers(data.users || []);
+        setUsersTotal(data.total ?? 0);
+        setUsersPage(data.page ?? page);
+      })
+      .catch(() => {})
+      .finally(() => setUsersLoading(false));
+  };
+  const loadAllUsersForSelect = () => {
+    return request('/users?limit=5000')
+      .then((data) => {
+        const list = Array.isArray(data) ? data : (data?.users ?? []);
+        setAllUsersForSelect(list);
+      })
+      .catch(() => {});
+  };
   const loadRoles = () => request('/users/roles').then(setRoles).catch(() => {});
   const loadDivisions = () => request('/users/divisions').then(setDivisions).catch(() => {});
   const loadDelegations = () => request('/delegations').then(setDelegations).catch(() => {});
 
+  const usersTotalPages = Math.max(1, Math.ceil(usersTotal / usersLimit));
+
+  /** Page numbers to show in pagination (e.g. [1, 2, 3, '...', 9, 10]) */
+  const paginationPageNumbers = (() => {
+    const total = usersTotalPages;
+    const current = usersPage;
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const pages = new Set([1, total]);
+    pages.add(current);
+    if (current > 1) pages.add(current - 1);
+    if (current < total) pages.add(current + 1);
+    if (current > 2) pages.add(2);
+    if (current < total - 1) pages.add(total - 1);
+    const sorted = [...pages].sort((a, b) => a - b);
+    const out = [];
+    let prev = 0;
+    for (const p of sorted) {
+      if (p > prev + 1) out.push('...');
+      out.push(p);
+      prev = p;
+    }
+    return out;
+  })();
+
   useEffect(() => {
     loadDivisions();
     loadRoles();
-    loadUsers();
+    loadUsers(1);
+    loadAllUsersForSelect();
   }, [request]);
   useEffect(() => {
-    if (tab === 'delegations') loadDelegations();
+    if (tab === 'delegations') {
+      loadDelegations();
+      if (allUsersForSelect.length === 0) loadAllUsersForSelect();
+    }
   }, [tab, request]);
 
   const handleCreateUser = async (e) => {
@@ -78,7 +146,8 @@ export default function AdminView() {
         }),
       });
       setUserForm(null);
-      loadUsers();
+      loadUsers(usersPage);
+      loadAllUsersForSelect();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -118,7 +187,8 @@ export default function AdminView() {
         body: JSON.stringify(body),
       });
       setUserForm(null);
-      loadUsers();
+      loadUsers(usersPage);
+      loadAllUsersForSelect();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -155,13 +225,53 @@ export default function AdminView() {
   };
 
   const handleDeleteUser = async () => {
-    if (!deleteConfirm) return;
+    if (!deleteConfirm || deleteConfirm.type !== 'single') return;
     setLoading(true);
     setError('');
     try {
       await request(`/users/${deleteConfirm.id}`, { method: 'DELETE' });
       setDeleteConfirm(null);
-      loadUsers();
+      loadUsers(usersPage);
+      loadAllUsersForSelect();
+      clearUserSelection();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleUserSelection = (id) => {
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAllUsersOnPage = () => {
+    setSelectedUserIds(new Set(users.map((u) => u.id)));
+  };
+
+  const clearUserSelection = () => {
+    setSelectedUserIds(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    if (!deleteConfirm || deleteConfirm.type !== 'bulk' || selectedUserIds.size === 0) return;
+    setLoading(true);
+    setError('');
+    try {
+      await request('/users/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [...selectedUserIds] }),
+      });
+      setDeleteConfirm(null);
+      clearUserSelection();
+      loadUsers(usersPage);
+      loadAllUsersForSelect();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -228,6 +338,109 @@ export default function AdminView() {
     }
   };
 
+  const openAdModal = () => {
+    setAdModalOpen(true);
+    setAdUsername('');
+    setAdPassword('');
+    setSyncResult(null);
+    setSyncError('');
+    setAdFetchedUsers([]);
+    setAdSelectedUsernames(new Set());
+    setAdSearchFilter('');
+  };
+
+  const handleFetchFromAd = async (e) => {
+    e.preventDefault();
+    if (!adUsername.trim() || !adPassword) {
+      setSyncError('AD username and password are required');
+      return;
+    }
+    setSyncLoading(true);
+    setSyncError('');
+    setSyncResult(null);
+    setAdFetchedUsers([]);
+    setAdSelectedUsernames(new Set());
+    try {
+      const data = await request('/users/sync-ad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ad_username: adUsername.trim(), ad_password: adPassword, dry_run: true }),
+      });
+      const users = data.users || [];
+      setAdFetchedUsers(users);
+      setAdSelectedUsernames(new Set(users.map((u) => u.username).filter(Boolean)));
+      setAdSearchFilter('');
+      setAdPassword('');
+    } catch (err) {
+      setSyncError(err.message || 'Fetch failed');
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
+  const toggleAdUser = (username) => {
+    setAdSelectedUsernames((prev) => {
+      const next = new Set(prev);
+      if (next.has(username)) next.delete(username);
+      else next.add(username);
+      return next;
+    });
+  };
+
+  const selectAllAdUsers = (visibleOnly = false) => {
+    const list = visibleOnly && adSearchFilter.trim() ? adFilteredUsers : adFetchedUsers;
+    setAdSelectedUsernames(new Set(list.map((u) => u.username).filter(Boolean)));
+  };
+
+  const deselectAllAdUsers = (visibleOnly = false) => {
+    if (visibleOnly && adSearchFilter.trim()) {
+      const visible = new Set(adFilteredUsers.map((u) => u.username).filter(Boolean));
+      setAdSelectedUsernames((prev) => {
+        const next = new Set(prev);
+        visible.forEach((u) => next.delete(u));
+        return next;
+      });
+    } else {
+      setAdSelectedUsernames(new Set());
+    }
+  };
+
+  const adSearchLower = adSearchFilter.trim().toLowerCase();
+  const adFilteredUsers = adSearchLower
+    ? adFetchedUsers.filter((u) => {
+        const name = (u.full_name || '').toLowerCase();
+        const un = (u.username || '').toLowerCase();
+        const em = (u.email || '').toLowerCase();
+        const div = (u.division_name || '').toLowerCase();
+        return name.includes(adSearchLower) || un.includes(adSearchLower) || em.includes(adSearchLower) || div.includes(adSearchLower);
+      })
+    : adFetchedUsers;
+
+  const handleImportSelectedAdUsers = async () => {
+    const toImport = adFetchedUsers.filter((u) => u.username && adSelectedUsernames.has(u.username));
+    if (toImport.length === 0) {
+      setSyncError('Select at least one user to import.');
+      return;
+    }
+    setImportLoading(true);
+    setSyncError('');
+    setSyncResult(null);
+    try {
+      const data = await request('/users/import-ad-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ users: toImport }),
+      });
+      setSyncResult(data);
+      loadUsers(usersPage);
+      loadAllUsersForSelect();
+    } catch (err) {
+      setSyncError(err.message || 'Import failed');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   const isCreate = userForm?.mode === 'create';
   const isEdit = userForm?.mode === 'edit';
 
@@ -272,167 +485,71 @@ export default function AdminView() {
           <div className="card">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
               <h3 className="section-title">Users</h3>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button type="button" className="btn btn-secondary" onClick={openAdModal}>
+                  Update users from Active Directory
+                </button>
                 <button type="button" className="btn btn-primary" onClick={() => setUserForm({ mode: 'create', ...emptyUserForm(roles[0]?.id) })}>
-                Add user
-              </button>
+                  Add user
+                </button>
+              </div>
             </div>
-
-            {(isCreate || isEdit) && (
-              <form
-                onSubmit={isCreate ? handleCreateUser : handleUpdateUser}
-                style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}
-              >
-                <h4 className="section-title">{isCreate ? 'New user' : 'Edit user'}</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div className="form-group">
-                    <label>Full name *</label>
-                    <input
-                      value={userForm.full_name}
-                      onChange={(e) => setUserForm((f) => ({ ...f, full_name: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Username</label>
-                    <input
-                      value={userForm.username}
-                      onChange={(e) => setUserForm((f) => ({ ...f, username: e.target.value }))}
-                      placeholder="e.g. imichel (for login)"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Email *</label>
-                    <input
-                      type="email"
-                      value={userForm.email}
-                      onChange={(e) => setUserForm((f) => ({ ...f, email: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Password {isEdit && '(leave blank to keep current)'}</label>
-                    <input
-                      type="password"
-                      value={userForm.password}
-                      onChange={(e) => setUserForm((f) => ({ ...f, password: e.target.value }))}
-                      required={isCreate}
-                      placeholder={isEdit ? '••••••••' : ''}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>VNPF no</label>
-                    <input
-                      value={userForm.vnpf_no}
-                      onChange={(e) => setUserForm((f) => ({ ...f, vnpf_no: e.target.value }))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Post title</label>
-                    <input
-                      value={userForm.post_title}
-                      onChange={(e) => setUserForm((f) => ({ ...f, post_title: e.target.value }))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Post no</label>
-                    <input
-                      value={userForm.post_no}
-                      onChange={(e) => setUserForm((f) => ({ ...f, post_no: e.target.value }))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Grade</label>
-                    <input
-                      value={userForm.grade}
-                      onChange={(e) => setUserForm((f) => ({ ...f, grade: e.target.value }))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Department</label>
-                    <input
-                      value={userForm.department}
-                      onChange={(e) => setUserForm((f) => ({ ...f, department: e.target.value }))}
-                      placeholder="e.g. VMGD"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Ministry</label>
-                    <input
-                      value={userForm.ministry}
-                      onChange={(e) => setUserForm((f) => ({ ...f, ministry: e.target.value }))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Entry date of service</label>
-                    <input
-                      type="date"
-                      value={userForm.entry_date}
-                      onChange={(e) => setUserForm((f) => ({ ...f, entry_date: e.target.value }))}
-                      title="Date when staff entered service or took their post"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Division</label>
-                    <select
-                      value={userForm.division_id ?? ''}
-                      onChange={(e) => setUserForm((f) => ({ ...f, division_id: e.target.value || null }))}
-                    >
-                      <option value="">—</option>
-                      {divisions.map((d) => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Reports to</label>
-                    <select
-                      value={userForm.reports_to_id ?? ''}
-                      onChange={(e) => setUserForm((f) => ({ ...f, reports_to_id: e.target.value || null }))}
-                    >
-                      <option value="">—</option>
-                      {users.filter((u) => u.id !== userForm.id).map((u) => (
-                        <option key={u.id} value={u.id}>{u.full_name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label>Roles</label>
-                  <div className="badge-group" style={{ gap: '0.5rem' }}>
-                    {roles.map((r) => (
-                      <label key={r.id} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
-                        <input
-                          type="checkbox"
-                          checked={(userForm.role_ids || []).includes(r.id)}
-                          onChange={(e) => setUserForm((f) => ({
-                            ...f,
-                            role_ids: e.target.checked
-                              ? [...(f.role_ids || []), r.id]
-                              : (f.role_ids || []).filter((rid) => rid !== r.id),
-                          }))}
-                          style={{ marginRight: '0.35rem' }}
-                        />
-                        <span className="badge" style={{ marginBottom: 0 }}>{r.role_name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button type="submit" className="btn btn-primary" disabled={loading}>
-                    {isCreate ? 'Create user' : 'Save changes'}
-                  </button>
-                  <button type="button" className="btn btn-secondary" onClick={() => setUserForm(null)}>
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            )}
           </div>
+
+          <div className="form-group" style={{ marginBottom: '1rem', maxWidth: 280 }}>
+            <label htmlFor="admin-division-filter">Filter by division</label>
+            <select
+              id="admin-division-filter"
+              value={divisionFilter}
+              onChange={(e) => {
+                const newDivision = e.target.value;
+                setDivisionFilter(newDivision);
+                loadUsers(1, newDivision);
+              }}
+              style={{ width: '100%' }}
+            >
+              <option value="">All divisions</option>
+              {divisions.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {selectedUserIds.size > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+              <button type="button" className="btn btn-secondary" onClick={selectAllUsersOnPage} disabled={usersLoading}>
+                Select all on page
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={clearUserSelection} disabled={usersLoading}>
+                Clear selection
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => setDeleteConfirm({ type: 'bulk', count: selectedUserIds.size })}
+                disabled={loading}
+              >
+                Delete selected ({selectedUserIds.size})
+              </button>
+              <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                {selectedUserIds.size} user(s) selected
+              </span>
+            </div>
+          )}
 
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
+                  <th style={{ width: 44 }}>
+                    <input
+                      type="checkbox"
+                      checked={users.length > 0 && users.every((u) => selectedUserIds.has(u.id))}
+                      onChange={(e) => (e.target.checked ? selectAllUsersOnPage() : clearUserSelection())}
+                      disabled={usersLoading || users.length === 0}
+                      aria-label="Select all on page"
+                    />
+                  </th>
                   <th>Name</th>
                   <th>Username</th>
                   <th>Email</th>
@@ -442,8 +559,28 @@ export default function AdminView() {
                 </tr>
               </thead>
               <tbody>
-                {users.map((u) => (
+                {usersLoading ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)' }}>
+                      Loading users…
+                    </td>
+                  </tr>
+                ) : users.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)' }}>
+                      {divisionFilter ? 'No users in this division.' : 'No users on this page.'}
+                    </td>
+                  </tr>
+                ) : users.map((u) => (
                   <tr key={u.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedUserIds.has(u.id)}
+                        onChange={() => toggleUserSelection(u.id)}
+                        aria-label={`Select ${u.full_name}`}
+                      />
+                    </td>
                     <td><strong>{u.full_name}</strong></td>
                     <td>{u.username || '—'}</td>
                     <td>{u.email}</td>
@@ -460,7 +597,7 @@ export default function AdminView() {
                     <td>
                       <div className="actions-cell">
                         <button type="button" className="btn btn-secondary" onClick={() => openEditUser(u)}>Edit</button>
-                        <button type="button" className="btn btn-danger" onClick={() => setDeleteConfirm({ id: u.id, full_name: u.full_name })}>Delete</button>
+                        <button type="button" className="btn btn-danger" onClick={() => setDeleteConfirm({ type: 'single', id: u.id, full_name: u.full_name })}>Delete</button>
                       </div>
                     </td>
                   </tr>
@@ -468,6 +605,52 @@ export default function AdminView() {
               </tbody>
             </table>
           </div>
+
+          {usersTotal > 0 && (
+            <div className="pagination-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.75rem', marginBottom: '1rem' }}>
+              <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                Showing {(usersPage - 1) * usersLimit + 1}–{Math.min(usersPage * usersLimit, usersTotal)} of {usersTotal} users
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={usersPage <= 1 || usersLoading}
+                  onClick={() => loadUsers(usersPage - 1)}
+                  aria-label="Previous page"
+                >
+                  Previous
+                </button>
+                {paginationPageNumbers.map((p, i) =>
+                  p === '...' ? (
+                    <span key={`ellipsis-${i}`} style={{ padding: '0 0.25rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      type="button"
+                      className={usersPage === p ? 'btn btn-primary' : 'btn btn-secondary'}
+                      disabled={usersLoading}
+                      onClick={() => loadUsers(p)}
+                      aria-label={`Page ${p}`}
+                      aria-current={usersPage === p ? 'page' : undefined}
+                      style={{ minWidth: 36 }}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={usersPage >= usersTotalPages || usersLoading}
+                  onClick={() => loadUsers(usersPage + 1)}
+                  aria-label="Next page"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="card">
             <h3 className="section-title">Roles</h3>
@@ -485,17 +668,349 @@ export default function AdminView() {
         </>
       )}
 
+      {adModalOpen && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ad-modal-title"
+          onClick={() => { setAdModalOpen(false); setAdFetchedUsers([]); setAdSelectedUsernames(new Set()); setAdSearchFilter(''); setSyncError(''); setSyncResult(null); }}
+        >
+          <div
+            className="modal-dialog card"
+            style={{ maxWidth: adFetchedUsers.length > 0 ? 720 : 480 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="ad-modal-title" className="section-title" style={{ marginTop: 0 }}>Update users from Active Directory</h3>
+          {syncError && <div className="alert alert-danger">{syncError}</div>}
+          {syncResult && (
+            <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'var(--success-soft)', borderRadius: 6 }}>
+              <p style={{ margin: 0, fontWeight: 600 }}>{syncResult.message}</p>
+              <p style={{ margin: '0.35rem 0 0', fontSize: '0.9rem' }}>
+                Created: {syncResult.created} · Updated: {syncResult.updated}
+              </p>
+              {syncResult.hint && <p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{syncResult.hint}</p>}
+            </div>
+          )}
+
+          {adFetchedUsers.length === 0 ? (
+            <>
+              <p className="card-subtitle" style={{ marginBottom: '1rem' }}>
+                Enter your AD credentials to fetch the list of users from VMGD AD. Then choose which users to import. Users are read from the configured OUs (Engineering, Climate, Forecast, Geoscience, Administration, Observation).
+              </p>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                Server: 192.168.60.2 (hpserver2l8.vmgd.gov.vu) · Domain: vmgd.gov.vu
+              </p>
+              <form onSubmit={handleFetchFromAd}>
+                <div className="form-group">
+                  <label htmlFor="ad-username">AD username</label>
+                  <input
+                    id="ad-username"
+                    type="text"
+                    value={adUsername}
+                    onChange={(e) => setAdUsername(e.target.value)}
+                    placeholder="e.g. imichel or your AD logon"
+                    autoComplete="username"
+                    disabled={syncLoading}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="ad-password">AD password</label>
+                  <input
+                    id="ad-password"
+                    type="password"
+                    value={adPassword}
+                    onChange={(e) => setAdPassword(e.target.value)}
+                    placeholder="Your AD password"
+                    autoComplete="current-password"
+                    disabled={syncLoading}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button type="submit" className="btn btn-primary" disabled={syncLoading}>
+                    {syncLoading ? 'Fetching…' : 'Fetch from AD'}
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={() => { setAdModalOpen(false); setSyncError(''); setSyncResult(null); }} disabled={syncLoading}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </>
+          ) : (
+            <>
+              <p className="card-subtitle" style={{ marginBottom: '0.75rem' }}>
+                Select the users to import. Uncheck any accounts you don’t want (e.g. service or test accounts). Then click Import selected.
+              </p>
+              <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                <label htmlFor="ad-search-users" style={{ marginBottom: '0.25rem' }}>Search</label>
+                <input
+                  id="ad-search-users"
+                  type="text"
+                  value={adSearchFilter}
+                  onChange={(e) => setAdSearchFilter(e.target.value)}
+                  placeholder="Search by name, username, email, or division…"
+                  style={{ width: '100%', maxWidth: 360 }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => selectAllAdUsers(true)} disabled={importLoading}>
+                  Select all{adSearchFilter.trim() ? ' visible' : ''}
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => deselectAllAdUsers(true)} disabled={importLoading}>
+                  Deselect all{adSearchFilter.trim() ? ' visible' : ''}
+                </button>
+                <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', alignSelf: 'center' }}>
+                  {adSelectedUsernames.size} of {adFetchedUsers.length} selected
+                  {adSearchFilter.trim() && adFilteredUsers.length !== adFetchedUsers.length && ` (${adFilteredUsers.length} visible)`}
+                </span>
+              </div>
+              <div className="table-wrap" style={{ maxHeight: 320, overflow: 'auto', marginBottom: '1rem' }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th style={{ width: 44 }}></th>
+                      <th>Name</th>
+                      <th>Username</th>
+                      <th>Email</th>
+                      <th>Division</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adFilteredUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)' }}>
+                          {adSearchFilter.trim() ? 'No users match your search.' : 'No users.'}
+                        </td>
+                      </tr>
+                    ) : adFilteredUsers.map((u) => (
+                      <tr key={u.username || u.email}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={u.username ? adSelectedUsernames.has(u.username) : false}
+                            onChange={() => u.username && toggleAdUser(u.username)}
+                            disabled={!u.username}
+                            aria-label={`Select ${u.full_name || u.username}`}
+                          />
+                        </td>
+                        <td><strong>{u.full_name || '—'}</strong></td>
+                        <td>{u.username || '—'}</td>
+                        <td>{u.email || '—'}</td>
+                        <td>{u.division_name || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button type="button" className="btn btn-primary" onClick={handleImportSelectedAdUsers} disabled={importLoading || adSelectedUsernames.size === 0}>
+                  {importLoading ? 'Importing…' : `Import selected (${adSelectedUsernames.size})`}
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => { setAdFetchedUsers([]); setAdSelectedUsernames(new Set()); setAdSearchFilter(''); setSyncError(''); setSyncResult(null); }} disabled={importLoading}>
+                  Fetch again
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => { setAdModalOpen(false); setAdFetchedUsers([]); setAdSelectedUsernames(new Set()); setAdSearchFilter(''); setSyncError(''); setSyncResult(null); }} disabled={importLoading}>
+                  Close
+                </button>
+              </div>
+            </>
+          )}
+          </div>
+        </div>
+      )}
+
       {deleteConfirm && (
-        <div className="card card-danger">
-          <h3 className="section-title">Confirm delete</h3>
-          <p>Delete user <strong>{deleteConfirm.full_name}</strong>? This will remove their leave applications and cannot be undone.</p>
-          <div className="actions-cell">
-            <button type="button" className="btn btn-danger" onClick={handleDeleteUser} disabled={loading}>
-              {loading ? 'Deleting...' : 'Delete'}
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => setDeleteConfirm(null)} disabled={loading}>
-              Cancel
-            </button>
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-confirm-title"
+          onClick={() => !loading && setDeleteConfirm(null)}
+        >
+          <div className="modal-dialog card" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+            <h3 id="delete-confirm-title" className="section-title" style={{ marginTop: 0 }}>
+              {deleteConfirm.type === 'single' ? 'Confirm delete' : 'Confirm bulk delete'}
+            </h3>
+            <p>
+              {deleteConfirm.type === 'single'
+                ? <>Delete user <strong>{deleteConfirm.full_name}</strong>? This will remove their leave applications and cannot be undone.</>
+                : <>Delete <strong>{deleteConfirm.count}</strong> user(s)? This will remove their leave applications and cannot be undone.</>
+              }
+            </p>
+            <div className="actions-cell">
+              <button type="button" className="btn btn-danger" onClick={deleteConfirm.type === 'single' ? handleDeleteUser : handleBulkDelete} disabled={loading}>
+                {loading ? 'Deleting…' : deleteConfirm.type === 'single' ? 'Delete' : `Delete ${deleteConfirm.count} user(s)`}
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => setDeleteConfirm(null)} disabled={loading}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(isCreate || isEdit) && userForm && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="user-form-modal-title"
+          onClick={() => !loading && setUserForm(null)}
+        >
+          <div
+            className="modal-dialog card"
+            style={{ maxWidth: 640, maxHeight: '90vh', overflow: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h4 id="user-form-modal-title" className="section-title" style={{ marginTop: 0 }}>
+              {isCreate ? 'New user' : 'Edit user'}
+            </h4>
+            <form
+              onSubmit={isCreate ? handleCreateUser : handleUpdateUser}
+              style={{ marginTop: '0.5rem' }}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group">
+                  <label>Full name *</label>
+                  <input
+                    value={userForm.full_name}
+                    onChange={(e) => setUserForm((f) => ({ ...f, full_name: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Username</label>
+                  <input
+                    value={userForm.username}
+                    onChange={(e) => setUserForm((f) => ({ ...f, username: e.target.value }))}
+                    placeholder="e.g. imichel (for login)"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Email *</label>
+                  <input
+                    type="email"
+                    value={userForm.email}
+                    onChange={(e) => setUserForm((f) => ({ ...f, email: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Password {isEdit && '(leave blank to keep current)'}</label>
+                  <input
+                    type="password"
+                    value={userForm.password}
+                    onChange={(e) => setUserForm((f) => ({ ...f, password: e.target.value }))}
+                    required={isCreate}
+                    placeholder={isEdit ? '••••••••' : ''}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>VNPF no</label>
+                  <input
+                    value={userForm.vnpf_no}
+                    onChange={(e) => setUserForm((f) => ({ ...f, vnpf_no: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Post title</label>
+                  <input
+                    value={userForm.post_title}
+                    onChange={(e) => setUserForm((f) => ({ ...f, post_title: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Post no</label>
+                  <input
+                    value={userForm.post_no}
+                    onChange={(e) => setUserForm((f) => ({ ...f, post_no: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Grade</label>
+                  <input
+                    value={userForm.grade}
+                    onChange={(e) => setUserForm((f) => ({ ...f, grade: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Department</label>
+                  <input
+                    value={userForm.department}
+                    onChange={(e) => setUserForm((f) => ({ ...f, department: e.target.value }))}
+                    placeholder="e.g. VMGD"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Ministry</label>
+                  <input
+                    value={userForm.ministry}
+                    onChange={(e) => setUserForm((f) => ({ ...f, ministry: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Entry date of service</label>
+                  <input
+                    type="date"
+                    value={userForm.entry_date}
+                    onChange={(e) => setUserForm((f) => ({ ...f, entry_date: e.target.value }))}
+                    title="Date when staff entered service or took their post"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Division</label>
+                  <SearchableSelect
+                    value={userForm.division_id ?? ''}
+                    options={divisions}
+                    getOptionLabel={(d) => d.name}
+                    onChange={(v) => setUserForm((f) => ({ ...f, division_id: v ?? '' }))}
+                    placeholder="—"
+                    emptyOptionLabel="—"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Reports to</label>
+                  <SearchableSelect
+                    value={userForm.reports_to_id ?? ''}
+                    options={allUsersForSelect || []}
+                    getOptionLabel={(u) => u.full_name}
+                    onChange={(v) => setUserForm((f) => ({ ...f, reports_to_id: v ?? '' }))}
+                    placeholder="—"
+                    emptyOptionLabel="—"
+                    excludeId={userForm.id}
+                  />
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Roles</label>
+                <div className="badge-group" style={{ gap: '0.5rem' }}>
+                  {roles.map((r) => (
+                    <label key={r.id} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={(userForm.role_ids || []).includes(r.id)}
+                        onChange={(e) => setUserForm((f) => ({
+                          ...f,
+                          role_ids: e.target.checked
+                            ? [...(f.role_ids || []), r.id]
+                            : (f.role_ids || []).filter((rid) => rid !== r.id),
+                        }))}
+                        style={{ marginRight: '0.35rem' }}
+                      />
+                      <span className="badge" style={{ marginBottom: 0 }}>{r.role_name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="submit" className="btn btn-primary" disabled={loading}>
+                  {isCreate ? 'Create user' : 'Save changes'}
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => setUserForm(null)}>
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -510,21 +1025,25 @@ export default function AdminView() {
             <form onSubmit={handleCreateDelegation} style={{ maxWidth: 500 }}>
               <div className="form-group">
                 <label>Delegator (person away)</label>
-                <select value={delegForm.delegator_id} onChange={(e) => setDelegForm((f) => ({ ...f, delegator_id: e.target.value }))} required>
-                  <option value="">Select...</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>{u.full_name} ({u.email})</option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  value={delegForm.delegator_id}
+                  options={allUsersForSelect || []}
+                  getOptionLabel={(u) => `${u.full_name} (${u.email || ''})`}
+                  onChange={(v) => setDelegForm((f) => ({ ...f, delegator_id: v ?? '' }))}
+                  placeholder="Select..."
+                  required
+                />
               </div>
               <div className="form-group">
                 <label>Delegatee (acting)</label>
-                <select value={delegForm.delegatee_id} onChange={(e) => setDelegForm((f) => ({ ...f, delegatee_id: e.target.value }))} required>
-                  <option value="">Select...</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>{u.full_name} ({u.email})</option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  value={delegForm.delegatee_id}
+                  options={allUsersForSelect || []}
+                  getOptionLabel={(u) => `${u.full_name} (${u.email || ''})`}
+                  onChange={(v) => setDelegForm((f) => ({ ...f, delegatee_id: v ?? '' }))}
+                  placeholder="Select..."
+                  required
+                />
               </div>
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <div className="form-group">

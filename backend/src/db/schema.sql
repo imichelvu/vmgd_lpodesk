@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS users (
   entry_date DATE,
   division_id INTEGER REFERENCES divisions(id),
   reports_to_id INTEGER REFERENCES users(id),
+  source VARCHAR(20) NOT NULL DEFAULT 'local',
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -141,6 +142,18 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE TRIGGER notifications_updated_at
   BEFORE UPDATE ON notifications
   FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+
+-- password_reset_tokens (for forgot-password flow)
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token VARCHAR(64) NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires ON password_reset_tokens(expires_at);
 
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_users_division ON users(division_id);

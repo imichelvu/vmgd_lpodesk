@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 function getAppName() {
@@ -69,8 +69,13 @@ export default function Login() {
   return (
     <div className="login-page">
       <div className="card login-card">
-        <h2 className="section-title" style={{ marginTop: 0 }}>{getAppName()}</h2>
-        <p className="card-subtitle" style={{ marginTop: '-8px' }}>Sign in to your account</p>
+        <div className="login-card-header">
+          <div className="login-logo-wrap">
+            <img src="/vmgd-logo.png" alt="VMGD logo" className="login-logo" />
+          </div>
+          <h1 className="login-title">{getAppName()}</h1>
+          <p className="login-subtitle">Sign in to your account</p>
+        </div>
         <form onSubmit={handleSubmit} className="login-form">
           {error && <div className="alert alert-danger">{error}</div>}
           <div className="form-group">
@@ -100,6 +105,9 @@ export default function Login() {
           <button type="submit" className="btn btn-primary login-submit" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign in'}
           </button>
+          <p className="login-forgot-wrap">
+            <Link to="/forgot-password" className="login-forgot-link">Forgot password?</Link>
+          </p>
         </form>
 
         <div className="login-troubleshoot">

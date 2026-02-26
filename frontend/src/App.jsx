@@ -4,6 +4,8 @@ import { useAuth } from './context/AuthContext';
 import { ROLE_IDS } from './context/AuthContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import NewApplication from './pages/NewApplication';
 import SupervisorView from './pages/SupervisorView';
@@ -25,6 +27,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route
         path="/"
         element={

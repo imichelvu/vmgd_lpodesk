@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { login, me } from '../controllers/authController.js';
+import { login, me, forgotPassword, resetPassword } from '../controllers/authController.js';
 import { authRequired } from '../middleware/auth.js';
 
 const asyncHandler = (fn) => (req, res, next) => {
@@ -9,4 +9,6 @@ const asyncHandler = (fn) => (req, res, next) => {
 const router = Router();
 router.post('/login', asyncHandler(login));
 router.get('/me', authRequired, me);
+router.post('/forgot-password', asyncHandler(forgotPassword));
+router.post('/reset-password', asyncHandler(resetPassword));
 export default router;

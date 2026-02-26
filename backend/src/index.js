@@ -11,7 +11,16 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const startTime = Date.now();
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }));
+const corsOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean)
+  : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || corsOrigins.includes(origin)) return cb(null, origin || corsOrigins[0]);
+    return cb(null, false);
+  },
+  credentials: true,
+}));
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
