@@ -1159,6 +1159,73 @@ tr:hover td {
   background: var(--danger-soft);
 }
 
+/* Small metrics row used on dashboards */
+.stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0 20px;
+}
+
+.stat-card {
+  flex: 1 1 150px;
+  min-width: 140px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.stat-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.stat-card-success {
+  border-color: var(--success);
+  background: var(--success-soft);
+}
+
+.stat-card-warning {
+  border-color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.stat-card-danger {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+/* Simple table pagination controls */
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 4px 0;
+  font-size: 13px;
+}
+
+.table-pagination-info {
+  color: var(--text-muted);
+}
+
 /* Signature pad – keep within form area */
 .signature-pad-wrapper {
   max-width: 100%;
