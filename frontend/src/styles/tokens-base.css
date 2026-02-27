@@ -1,0 +1,81 @@
+/* =========================================
+   Theme tokens + global reset/base elements
+   ========================================= */
+
+:root {
+  --bg: #f3f3f3;
+  --bg-subtle: #fafafa;
+  --surface: #ffffff;
+  --surface-hover: #f5f5f5;
+  --surface-pressed: #edebe9;
+  --border: #e5e5e5;
+  --border-strong: #d1d1d1;
+  --text: #242424;
+  --text-muted: #605e5c;
+  --text-secondary: #424242;
+  --accent: #0078d4;
+  --accent-hover: #106ebe;
+  --accent-pressed: #005a9e;
+  --accent-soft: rgba(0, 120, 212, 0.12);
+  --success: #107c10;
+  --success-soft: rgba(16, 124, 16, 0.12);
+  --warning: #ff8c00;
+  --warning-soft: rgba(255, 140, 0, 0.12);
+  --danger: #d13438;
+  --danger-soft: rgba(209, 52, 56, 0.12);
+  --radius: 8px;
+  --radius-sm: 4px;
+  --radius-lg: 12px;
+  --font: "Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-focus: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+input, select, textarea, button {
+  font-family: inherit;
+  font-size: 14px;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+

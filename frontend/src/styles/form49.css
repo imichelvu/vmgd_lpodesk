@@ -1,0 +1,262 @@
+/* ===========================
+   Form 4-9 preview + html doc
+   =========================== */
+
+.form49-preview {
+  width: 100%;
+  max-width: 800px;
+}
+
+.form49-preview-inner {
+  position: relative;
+  width: 100%;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.form49-preview-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  vertical-align: top;
+}
+
+.form49-preview-fallback {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.form49-preview-fallback code {
+  background: var(--surface-hover);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.form49-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.form49-field {
+  position: absolute;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 45%;
+  transform: translateY(2px);
+}
+
+/* Form 4-9 HTML rendering (structured preview) */
+.form49-preview .form49-doc {
+  width: 100%;
+  max-width: 600px;
+  background: #fff;
+  color: #000;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 11px;
+  line-height: 1.35;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.form49-doc-inner {
+  padding: 14px 16px 18px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form49-header {
+  text-align: center;
+  margin-bottom: 12px;
+  position: relative;
+}
+
+.form49-form-id {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.form49-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.form49-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 28%) 1fr minmax(0, 10%) 1fr;
+  gap: 4px 10px;
+  align-items: end;
+  margin-bottom: 10px;
+}
+
+.form49-grid-sm {
+  margin-bottom: 6px;
+}
+
+.form49-value-span {
+  grid-column: 2 / -1;
+}
+
+.form49-value-span-right {
+  grid-column: 3 / -1;
+}
+
+.form49-full {
+  grid-column: 1 / -1;
+}
+
+.form49-label-span {
+  grid-column: 1 / span 2;
+}
+
+.form49-label {
+  font-size: 11px;
+  font-weight: 400;
+  white-space: normal;
+  word-break: break-word;
+  padding-right: 6px;
+  align-self: start;
+}
+
+.form49-label-bold {
+  font-weight: 700;
+}
+
+.form49-label-right {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+.form49-value {
+  padding-top: 4px;
+  padding-bottom: 2px;
+  min-height: 18px;
+}
+
+.form49-line {
+  display: inline-block;
+  min-height: 14px;
+  border-bottom: 1px solid #000;
+  padding-bottom: 0;
+  font-size: 11px;
+  color: #000;
+  vertical-align: bottom;
+  line-height: 1.2;
+}
+
+.form49-note,
+.form49-note-inline {
+  font-size: 9px;
+  font-style: italic;
+  color: #000;
+  padding: 1px 0;
+}
+
+.form49-note-inline {
+  font-weight: 400;
+  padding-left: 4px;
+}
+
+.form49-note-block {
+  padding: 6px 0 4px 8px;
+  line-height: 1.3;
+}
+
+.form49-doc #form49-advance-note {
+  padding-left: 1em;
+}
+
+.form49-label-inline {
+  padding-left: 16px;
+  margin-right: 6px;
+  white-space: nowrap;
+}
+
+.form49-yesno {
+  vertical-align: bottom;
+  padding-top: 4px;
+  padding-bottom: 2px;
+}
+
+.form49-yesno .form49-yn,
+.form49-yesno .form49-label-inline,
+.form49-yesno .form49-line {
+  display: inline-block;
+}
+
+.form49-yesno .form49-line {
+  margin-left: 4px;
+}
+
+.form49-yn {
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.form49-yn-selected {
+  text-decoration: underline;
+}
+
+.form49-signature-cell {
+  vertical-align: bottom;
+  border-bottom: none !important;
+}
+
+.form49-signature-img {
+  display: block;
+  max-height: 28px;
+  width: auto;
+  max-width: 180px;
+  object-fit: contain;
+  object-position: left bottom;
+  vertical-align: bottom;
+}
+
+.form49-section {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #333;
+}
+
+.form49-section-title {
+  margin: 0 0 6px 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.form49-section-title-underline {
+  border-bottom: 1px solid #000;
+  padding-bottom: 2px;
+}
+
+.form49-hro .form49-section-title {
+  margin-bottom: 4px;
+}
+
+.form49-footer {
+  text-align: center;
+  font-size: 10px;
+  margin-top: 14px;
+  padding-top: 6px;
+}
+

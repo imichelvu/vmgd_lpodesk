@@ -1,29 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React from 'react';
 import { useApi } from '../hooks/useApi';
+import { useRequestList } from '../hooks/useRequestList';
 import Button from '../components/Button';
 
 export default function DirectorView() {
   const { request } = useApi();
-  const [list, setList] = useState([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    request('/leave/director')
-      .then((data) => { if (!cancelled) setList(data); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [request]);
+  const { list } = useRequestList(request, '/leave/director', []);
 
   return (
     <>
       <h2>Director — Final sign-off</h2>
-      <p style={{ color: 'var(--text-muted)' }}>
+      <p className="text-muted">
         All VMGD staff applications across divisions, after manager approval. Perform final sign-off here.
       </p>
       {list.length === 0 ? (
         <div className="card">
-          <p style={{ color: 'var(--text-muted)' }}>No applications pending Director sign-off.</p>
+          <p className="text-muted">No applications pending Director sign-off.</p>
         </div>
       ) : (
         <div className="table-wrap">
@@ -49,7 +41,7 @@ export default function DirectorView() {
                   <td>{app.start_date}</td>
                   <td>{app.total_working_days}</td>
                   <td>
-                    <Button to={`/application/${app.id}`} variant="primary" size="sm" style={{ padding: '0.35rem 0.75rem' }}>
+                    <Button to={`/application/${app.id}`} variant="primary" size="sm">
                       Sign off
                     </Button>
                   </td>

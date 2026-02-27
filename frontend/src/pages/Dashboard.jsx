@@ -1,38 +1,27 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ROLE_IDS } from '../context/AuthContext';
 import { useApi } from '../hooks/useApi';
+import { useRequestList } from '../hooks/useRequestList';
+import { usePagination } from '../hooks/usePagination';
 import Button from '../components/Button';
 import StatsRow from '../components/StatsRow';
-
-const STATUS_LABELS = {
-  Pending_PSO: 'Pending Superior',
-  Pending_Manager: 'Pending Manager',
-  Pending_Director: 'Pending Director',
-  Approved: 'Approved',
-  Disapproved: 'Disapproved',
-};
+import { toApplicationStatusLabel } from '../constants/applicationStatus';
 
 export default function Dashboard() {
   const { user, hasRole } = useAuth();
   const { request } = useApi();
-  const [applications, setApplications] = useState([]);
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 20;
-
-  useEffect(() => {
-    let cancelled = false;
-    request('/leave/mine')
-      .then((data) => { if (!cancelled) setApplications(data); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [request]);
-
-  useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(applications.length / PAGE_SIZE));
-    if (page > totalPages) setPage(totalPages);
-  }, [applications, page]);
+  const { list: applications } = useRequestList(request, '/leave/mine', []);
+  const {
+    page,
+    setPage,
+    totalPages,
+    pageItems: pagedApplications,
+    hasPagination,
+    canPrev,
+    canNext,
+  } = usePagination(applications, 20);
 
   const stats = useMemo(() => {
     if (!Array.isArray(applications) || !applications.length) {
@@ -50,41 +39,29 @@ export default function Dashboard() {
     ];
   }, [applications]);
 
-  const pagedApplications = useMemo(() => {
-    if (!applications.length) return [];
-    const start = (page - 1) * PAGE_SIZE;
-    const end = start + PAGE_SIZE;
-    return applications.slice(start, end);
-  }, [applications, page]);
-
-  const totalPages = useMemo(
-    () => Math.max(1, Math.ceil((applications.length || 0) / PAGE_SIZE)),
-    [applications.length]
-  );
-
   return (
     <>
       <h2>Dashboard</h2>
-      <p style={{ color: 'var(--text-muted)' }}>Welcome, {user?.full_name}.</p>
+      <p className="text-muted">Welcome, {user?.full_name}.</p>
 
       <StatsRow items={stats} />
 
       {hasRole(ROLE_IDS.Staff) && (
         <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <h3 style={{ margin: 0 }}>My leave applications</h3>
+          <div className="dashboard-section-title-row">
+            <h3 className="dashboard-section-title">My leave applications</h3>
             <Button to="/apply" variant="primary">New application</Button>
           </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+          <p className="text-muted dashboard-helper-text">
             View status of your applications. Use “New application” to submit PSC Form 4-9.
           </p>
         </div>
       )}
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Recent applications</h3>
+        <h3 className="dashboard-section-title">Recent applications</h3>
         {applications.length === 0 ? (
-          <p style={{ color: 'var(--text-muted)' }}>No applications yet.</p>
+          <p className="text-muted">No applications yet.</p>
         ) : (
           <>
             <div className="table-wrap">
@@ -108,7 +85,7 @@ export default function Dashboard() {
                       <td>{app.start_date}</td>
                       <td>{app.end_date}</td>
                       <td>{app.total_working_days}</td>
-                      <td>{STATUS_LABELS[app.status] || app.status}</td>
+                      <td>{toApplicationStatusLabel(app.status)}</td>
                       <td>
                         <Link to={`/application/${app.id}`}>View</Link>
                       </td>
@@ -117,13 +94,13 @@ export default function Dashboard() {
                 </tbody>
               </table>
             </div>
-            {applications.length > PAGE_SIZE && (
+            {hasPagination && (
               <div className="table-pagination">
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                  disabled={!canPrev}
                 >
                   Previous
                 </button>
@@ -133,8 +110,8 @@ export default function Dashboard() {
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={!canNext}
                 >
                   Next
                 </button>
@@ -144,7 +121,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+      <div className="dashboard-quick-actions">
         {hasRole([ROLE_IDS.PSO, ROLE_IDS.Manager]) && (
           <Button to="/supervisor" variant="secondary">Go to Approvals</Button>
         )}

@@ -3,7 +3,7 @@ import Form49Overlay from './Form49Overlay';
 
 /**
  * PSC Form 4-9 preview – form image + overlay text (matches overlay.html positions).
- * Tweak --top-offset and positions in index.css under .form49-overlay-preview.
+ * Tweak --top-offset and positions in Form49Overlay.css / styles modules.
  */
 export default function Form49Preview({ user, formData }) {
   return (

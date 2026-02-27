@@ -1,25 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useMemo } from 'react';
 import { useApi } from '../hooks/useApi';
+import { useRequestList } from '../hooks/useRequestList';
 import Button from '../components/Button';
 import StatsRow from '../components/StatsRow';
-
-const STATUS_LABELS = {
-  Pending_PSO: 'Pending Superior',
-  Pending_Manager: 'Pending Manager',
-};
+import { toApplicationStatusLabel } from '../constants/applicationStatus';
 
 export default function SupervisorView() {
   const { request } = useApi();
-  const [list, setList] = useState([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    request('/leave/supervisor')
-      .then((data) => { if (!cancelled) setList(data); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [request]);
+  const { list } = useRequestList(request, '/leave/supervisor', []);
 
   const stats = useMemo(() => {
     if (!Array.isArray(list) || !list.length) return [];
@@ -57,13 +45,13 @@ export default function SupervisorView() {
   return (
     <>
       <h2>Approvals</h2>
-      <p style={{ color: 'var(--text-muted)' }}>
+      <p className="text-muted">
         Applications from your division requiring your approval. Acting delegations are included.
       </p>
       <StatsRow items={stats} />
       {list.length === 0 ? (
         <div className="card">
-          <p style={{ color: 'var(--text-muted)' }}>No applications pending your approval.</p>
+          <p className="text-muted">No applications pending your approval.</p>
         </div>
       ) : (
         <div className="table-wrap">
@@ -89,9 +77,9 @@ export default function SupervisorView() {
                   <td>{app.leave_type}</td>
                   <td>{app.start_date}</td>
                   <td>{app.total_working_days}</td>
-                  <td>{STATUS_LABELS[app.status] || app.status}</td>
+                  <td>{toApplicationStatusLabel(app.status)}</td>
                   <td>
-                    <Button to={`/application/${app.id}`} variant="primary" size="sm" style={{ padding: '0.35rem 0.75rem' }}>
+                    <Button to={`/application/${app.id}`} variant="primary" size="sm">
                       Review
                     </Button>
                   </td>
