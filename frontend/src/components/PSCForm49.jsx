@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { getWorkingDays, getWorkingDaysFromDateTime, isAdvancePayWarning } from '../utils/workingDays';
-import SignaturePad from './SignaturePad';
+import SignatureField from './SignatureField';
+import Button from './Button';
 
 const LEAVE_TYPES = [
   'Annual vacation',
@@ -334,23 +335,26 @@ export default function PSCForm49({ onSubmit, loading, initialValues, onFormChan
 
       {/* Signature */}
       <section className="form-section">
-        <h4 className="section-title section-title-sm">Applicant signature</h4>
-        <SignaturePad
+        <SignatureField
+          label="Applicant signature"
+          required
           width={320}
           height={120}
-          onSave={setSignatureData}
-          savedData={typeof signature_data === 'string' ? signature_data : null}
+          value={typeof signature_data === 'string' ? signature_data : null}
+          onChange={setSignatureData}
         />
       </section>
 
       <div className="form-actions">
-        <button
+        <Button
           type="submit"
-          className="btn btn-primary"
-          disabled={loading || !signature_data || dateTimeRangeInvalid}
+          variant="primary"
+          disabled={!signature_data || dateTimeRangeInvalid}
+          loading={loading}
+          loadingText="Submitting..."
         >
-          {loading ? 'Submitting...' : 'Submit application'}
-        </button>
+          Submit application
+        </Button>
       </div>
     </form>
   );

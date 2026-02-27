@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
 import SearchableSelect from '../components/SearchableSelect';
+import Button from '../components/Button';
+import Modal from '../components/Modal';
+import ConfirmDialog from '../components/ConfirmDialog';
+import UsersSectionHeader from '../components/admin/UsersSectionHeader';
+import DivisionFilter from '../components/admin/DivisionFilter';
+import UserBulkActions from '../components/admin/UserBulkActions';
+import UsersTable from '../components/admin/UsersTable';
+import UsersPagination from '../components/admin/UsersPagination';
 
 const emptyUserForm = (defaultRoleId) => ({
   full_name: '',
@@ -454,9 +462,9 @@ export default function AdminView() {
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
           Send (or resend) approval emails for all leave applications still pending PSO, Manager, or Director. Use this if emails were not sent when applications were submitted.
         </p>
-        <button type="button" className="btn btn-secondary" onClick={handleResendPendingEmails} disabled={resendLoading}>
-          {resendLoading ? 'Sending…' : 'Send emails for pending approvals'}
-        </button>
+        <Button type="button" variant="secondary" onClick={handleResendPendingEmails} loading={resendLoading} loadingText="Sending…">
+          Send emails for pending approvals
+        </Button>
         {resendResult && (
           <div style={{ marginTop: '1rem', padding: '0.75rem', background: 'var(--bg)', borderRadius: 6 }}>
             <p style={{ margin: 0, fontWeight: 600 }}>{resendResult.message}</p>
@@ -482,175 +490,52 @@ export default function AdminView() {
 
       {tab === 'users' && (
         <>
-          <div className="card">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-              <h3 className="section-title">Users</h3>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <button type="button" className="btn btn-secondary" onClick={openAdModal}>
-                  Update users from Active Directory
-                </button>
-                <button type="button" className="btn btn-primary" onClick={() => setUserForm({ mode: 'create', ...emptyUserForm(roles[0]?.id) })}>
-                  Add user
-                </button>
-              </div>
-            </div>
-          </div>
+          <UsersSectionHeader
+            onOpenAdModal={openAdModal}
+            onAddUser={() => setUserForm({ mode: 'create', ...emptyUserForm(roles[0]?.id) })}
+          />
 
-          <div className="form-group" style={{ marginBottom: '1rem', maxWidth: 280 }}>
-            <label htmlFor="admin-division-filter">Filter by division</label>
-            <select
-              id="admin-division-filter"
-              value={divisionFilter}
-              onChange={(e) => {
-                const newDivision = e.target.value;
-                setDivisionFilter(newDivision);
-                loadUsers(1, newDivision);
-              }}
-              style={{ width: '100%' }}
-            >
-              <option value="">All divisions</option>
-              {divisions.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-          </div>
+          <DivisionFilter
+            value={divisionFilter}
+            divisions={divisions}
+            onChange={(newDivision) => {
+              setDivisionFilter(newDivision);
+              loadUsers(1, newDivision);
+            }}
+          />
 
-          {selectedUserIds.size > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-              <button type="button" className="btn btn-secondary" onClick={selectAllUsersOnPage} disabled={usersLoading}>
-                Select all on page
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={clearUserSelection} disabled={usersLoading}>
-                Clear selection
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={() => setDeleteConfirm({ type: 'bulk', count: selectedUserIds.size })}
-                disabled={loading}
-              >
-                Delete selected ({selectedUserIds.size})
-              </button>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                {selectedUserIds.size} user(s) selected
-              </span>
-            </div>
-          )}
+          <UserBulkActions
+            selectedCount={selectedUserIds.size}
+            usersLoading={usersLoading}
+            loading={loading}
+            onSelectAll={selectAllUsersOnPage}
+            onClearSelection={clearUserSelection}
+            onBulkDelete={() => setDeleteConfirm({ type: 'bulk', count: selectedUserIds.size })}
+          />
 
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th style={{ width: 44 }}>
-                    <input
-                      type="checkbox"
-                      checked={users.length > 0 && users.every((u) => selectedUserIds.has(u.id))}
-                      onChange={(e) => (e.target.checked ? selectAllUsersOnPage() : clearUserSelection())}
-                      disabled={usersLoading || users.length === 0}
-                      aria-label="Select all on page"
-                    />
-                  </th>
-                  <th>Name</th>
-                  <th>Username</th>
-                  <th>Email</th>
-                  <th>Division</th>
-                  <th>Roles</th>
-                  <th style={{ width: 160 }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {usersLoading ? (
-                  <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)' }}>
-                      Loading users…
-                    </td>
-                  </tr>
-                ) : users.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)' }}>
-                      {divisionFilter ? 'No users in this division.' : 'No users on this page.'}
-                    </td>
-                  </tr>
-                ) : users.map((u) => (
-                  <tr key={u.id}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedUserIds.has(u.id)}
-                        onChange={() => toggleUserSelection(u.id)}
-                        aria-label={`Select ${u.full_name}`}
-                      />
-                    </td>
-                    <td><strong>{u.full_name}</strong></td>
-                    <td>{u.username || '—'}</td>
-                    <td>{u.email}</td>
-                    <td>{u.division_name || '—'}</td>
-                    <td>
-                      <div className="badge-group">
-                        {parseRoleIds(u.role_ids).map((rid) => {
-                          const r = roles.find((x) => x.id === rid);
-                          return r ? <span key={r.id} className="badge">{r.role_name}</span> : null;
-                        })}
-                        {parseRoleIds(u.role_ids).length === 0 && '—'}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="actions-cell">
-                        <button type="button" className="btn btn-secondary" onClick={() => openEditUser(u)}>Edit</button>
-                        <button type="button" className="btn btn-danger" onClick={() => setDeleteConfirm({ type: 'single', id: u.id, full_name: u.full_name })}>Delete</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <UsersTable
+            users={users}
+            usersLoading={usersLoading}
+            divisionFilter={divisionFilter}
+            selectedUserIds={selectedUserIds}
+            roles={roles}
+            parseRoleIds={parseRoleIds}
+            onToggleUserSelection={toggleUserSelection}
+            onSelectAllOnPage={selectAllUsersOnPage}
+            onClearSelection={clearUserSelection}
+            onEditUser={openEditUser}
+            onDeleteUser={(u) => setDeleteConfirm({ type: 'single', id: u.id, full_name: u.full_name })}
+          />
 
-          {usersTotal > 0 && (
-            <div className="pagination-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.75rem', marginBottom: '1rem' }}>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                Showing {(usersPage - 1) * usersLimit + 1}–{Math.min(usersPage * usersLimit, usersTotal)} of {usersTotal} users
-              </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  disabled={usersPage <= 1 || usersLoading}
-                  onClick={() => loadUsers(usersPage - 1)}
-                  aria-label="Previous page"
-                >
-                  Previous
-                </button>
-                {paginationPageNumbers.map((p, i) =>
-                  p === '...' ? (
-                    <span key={`ellipsis-${i}`} style={{ padding: '0 0.25rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>…</span>
-                  ) : (
-                    <button
-                      key={p}
-                      type="button"
-                      className={usersPage === p ? 'btn btn-primary' : 'btn btn-secondary'}
-                      disabled={usersLoading}
-                      onClick={() => loadUsers(p)}
-                      aria-label={`Page ${p}`}
-                      aria-current={usersPage === p ? 'page' : undefined}
-                      style={{ minWidth: 36 }}
-                    >
-                      {p}
-                    </button>
-                  )
-                )}
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  disabled={usersPage >= usersTotalPages || usersLoading}
-                  onClick={() => loadUsers(usersPage + 1)}
-                  aria-label="Next page"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
+          <UsersPagination
+            usersTotal={usersTotal}
+            usersPage={usersPage}
+            usersLimit={usersLimit}
+            usersLoading={usersLoading}
+            usersTotalPages={usersTotalPages}
+            paginationPageNumbers={paginationPageNumbers}
+            onLoadUsers={loadUsers}
+          />
 
           <div className="card">
             <h3 className="section-title">Roles</h3>
@@ -668,20 +553,13 @@ export default function AdminView() {
         </>
       )}
 
-      {adModalOpen && (
-        <div
-          className="modal-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="ad-modal-title"
-          onClick={() => { setAdModalOpen(false); setAdFetchedUsers([]); setAdSelectedUsernames(new Set()); setAdSearchFilter(''); setSyncError(''); setSyncResult(null); }}
-        >
-          <div
-            className="modal-dialog card"
-            style={{ maxWidth: adFetchedUsers.length > 0 ? 720 : 480 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 id="ad-modal-title" className="section-title" style={{ marginTop: 0 }}>Update users from Active Directory</h3>
+      <Modal
+        open={adModalOpen}
+        title="Update users from Active Directory"
+        titleId="ad-modal-title"
+        maxWidth={adFetchedUsers.length > 0 ? 720 : 480}
+        onClose={() => { setAdModalOpen(false); setAdFetchedUsers([]); setAdSelectedUsernames(new Set()); setAdSearchFilter(''); setSyncError(''); setSyncResult(null); }}
+      >
           {syncError && <div className="alert alert-danger">{syncError}</div>}
           {syncResult && (
             <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'var(--success-soft)', borderRadius: 6 }}>
@@ -727,12 +605,8 @@ export default function AdminView() {
                   />
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button type="submit" className="btn btn-primary" disabled={syncLoading}>
-                    {syncLoading ? 'Fetching…' : 'Fetch from AD'}
-                  </button>
-                  <button type="button" className="btn btn-secondary" onClick={() => { setAdModalOpen(false); setSyncError(''); setSyncResult(null); }} disabled={syncLoading}>
-                    Cancel
-                  </button>
+                  <Button type="submit" variant="primary" loading={syncLoading} loadingText="Fetching…">Fetch from AD</Button>
+                  <Button type="button" variant="secondary" onClick={() => { setAdModalOpen(false); setSyncError(''); setSyncResult(null); }} disabled={syncLoading}>Cancel</Button>
                 </div>
               </form>
             </>
@@ -753,12 +627,8 @@ export default function AdminView() {
                 />
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => selectAllAdUsers(true)} disabled={importLoading}>
-                  Select all{adSearchFilter.trim() ? ' visible' : ''}
-                </button>
-                <button type="button" className="btn btn-secondary" onClick={() => deselectAllAdUsers(true)} disabled={importLoading}>
-                  Deselect all{adSearchFilter.trim() ? ' visible' : ''}
-                </button>
+                <Button type="button" variant="secondary" onClick={() => selectAllAdUsers(true)} disabled={importLoading}>Select all{adSearchFilter.trim() ? ' visible' : ''}</Button>
+                <Button type="button" variant="secondary" onClick={() => deselectAllAdUsers(true)} disabled={importLoading}>Deselect all{adSearchFilter.trim() ? ' visible' : ''}</Button>
                 <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', alignSelf: 'center' }}>
                   {adSelectedUsernames.size} of {adFetchedUsers.length} selected
                   {adSearchFilter.trim() && adFilteredUsers.length !== adFetchedUsers.length && ` (${adFilteredUsers.length} visible)`}
@@ -803,68 +673,40 @@ export default function AdminView() {
                 </table>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <button type="button" className="btn btn-primary" onClick={handleImportSelectedAdUsers} disabled={importLoading || adSelectedUsernames.size === 0}>
-                  {importLoading ? 'Importing…' : `Import selected (${adSelectedUsernames.size})`}
-                </button>
-                <button type="button" className="btn btn-secondary" onClick={() => { setAdFetchedUsers([]); setAdSelectedUsernames(new Set()); setAdSearchFilter(''); setSyncError(''); setSyncResult(null); }} disabled={importLoading}>
-                  Fetch again
-                </button>
-                <button type="button" className="btn btn-secondary" onClick={() => { setAdModalOpen(false); setAdFetchedUsers([]); setAdSelectedUsernames(new Set()); setAdSearchFilter(''); setSyncError(''); setSyncResult(null); }} disabled={importLoading}>
-                  Close
-                </button>
+                <Button type="button" variant="primary" onClick={handleImportSelectedAdUsers} loading={importLoading} loadingText="Importing…" disabled={adSelectedUsernames.size === 0}>
+                  Import selected ({adSelectedUsernames.size})
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => { setAdFetchedUsers([]); setAdSelectedUsernames(new Set()); setAdSearchFilter(''); setSyncError(''); setSyncResult(null); }} disabled={importLoading}>Fetch again</Button>
+                <Button type="button" variant="secondary" onClick={() => { setAdModalOpen(false); setAdFetchedUsers([]); setAdSelectedUsernames(new Set()); setAdSearchFilter(''); setSyncError(''); setSyncResult(null); }} disabled={importLoading}>Close</Button>
               </div>
             </>
           )}
-          </div>
-        </div>
-      )}
+      </Modal>
 
-      {deleteConfirm && (
-        <div
-          className="modal-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-confirm-title"
-          onClick={() => !loading && setDeleteConfirm(null)}
-        >
-          <div className="modal-dialog card" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
-            <h3 id="delete-confirm-title" className="section-title" style={{ marginTop: 0 }}>
-              {deleteConfirm.type === 'single' ? 'Confirm delete' : 'Confirm bulk delete'}
-            </h3>
-            <p>
-              {deleteConfirm.type === 'single'
-                ? <>Delete user <strong>{deleteConfirm.full_name}</strong>? This will remove their leave applications and cannot be undone.</>
-                : <>Delete <strong>{deleteConfirm.count}</strong> user(s)? This will remove their leave applications and cannot be undone.</>
-              }
-            </p>
-            <div className="actions-cell">
-              <button type="button" className="btn btn-danger" onClick={deleteConfirm.type === 'single' ? handleDeleteUser : handleBulkDelete} disabled={loading}>
-                {loading ? 'Deleting…' : deleteConfirm.type === 'single' ? 'Delete' : `Delete ${deleteConfirm.count} user(s)`}
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={() => setDeleteConfirm(null)} disabled={loading}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={Boolean(deleteConfirm)}
+        title={deleteConfirm?.type === 'single' ? 'Confirm delete' : 'Confirm bulk delete'}
+        message={deleteConfirm?.type === 'single'
+          ? <>Delete user <strong>{deleteConfirm.full_name}</strong>? This will remove their leave applications and cannot be undone.</>
+          : <>Delete <strong>{deleteConfirm?.count ?? 0}</strong> user(s)? This will remove their leave applications and cannot be undone.</>
+        }
+        confirmText={deleteConfirm?.type === 'single' ? 'Delete' : `Delete ${deleteConfirm?.count ?? 0} user(s)`}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={deleteConfirm?.type === 'single' ? handleDeleteUser : handleBulkDelete}
+        loading={loading}
+        loadingText="Deleting…"
+      />
 
       {(isCreate || isEdit) && userForm && (
-        <div
-          className="modal-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="user-form-modal-title"
-          onClick={() => !loading && setUserForm(null)}
+        <Modal
+          open={Boolean((isCreate || isEdit) && userForm)}
+          title={isCreate ? 'New user' : 'Edit user'}
+          titleId="user-form-modal-title"
+          maxWidth={640}
+          style={{ maxHeight: '90vh', overflow: 'auto' }}
+          closeOnBackdrop={!loading}
+          onClose={() => setUserForm(null)}
         >
-          <div
-            className="modal-dialog card"
-            style={{ maxWidth: 640, maxHeight: '90vh', overflow: 'auto' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h4 id="user-form-modal-title" className="section-title" style={{ marginTop: 0 }}>
-              {isCreate ? 'New user' : 'Edit user'}
-            </h4>
             <form
               onSubmit={isCreate ? handleCreateUser : handleUpdateUser}
               style={{ marginTop: '0.5rem' }}
@@ -1003,16 +845,13 @@ export default function AdminView() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button type="submit" className="btn btn-primary" disabled={loading}>
+                <Button type="submit" variant="primary" loading={loading} loadingText={isCreate ? 'Creating…' : 'Saving…'}>
                   {isCreate ? 'Create user' : 'Save changes'}
-                </button>
-                <button type="button" className="btn btn-secondary" onClick={() => setUserForm(null)}>
-                  Cancel
-                </button>
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => setUserForm(null)}>Cancel</Button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {tab === 'delegations' && (
@@ -1055,7 +894,7 @@ export default function AdminView() {
                   <input type="date" value={delegForm.end_date} onChange={(e) => setDelegForm((f) => ({ ...f, end_date: e.target.value }))} required />
                 </div>
               </div>
-              <button type="submit" className="btn btn-primary" disabled={loading}>Create delegation</button>
+              <Button type="submit" variant="primary" loading={loading} loadingText="Creating…">Create delegation</Button>
             </form>
           </div>
           <div className="card">
@@ -1085,9 +924,9 @@ export default function AdminView() {
                         <td>{d.is_active ? 'Yes' : 'No'}</td>
                         <td>
                           {d.is_active && (
-                            <button type="button" className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={() => deactivateDelegation(d.id)}>
+                            <Button type="button" variant="secondary" size="sm" style={{ padding: '0.25rem 0.5rem' }} onClick={() => deactivateDelegation(d.id)}>
                               Deactivate
-                            </button>
+                            </Button>
                           )}
                         </td>
                       </tr>

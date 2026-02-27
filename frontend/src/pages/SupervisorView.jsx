@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
+import Button from '../components/Button';
 
 const STATUS_LABELS = {
   Pending_PSO: 'Pending Superior',
@@ -55,9 +56,9 @@ export default function SupervisorView() {
                   <td>{app.total_working_days}</td>
                   <td>{STATUS_LABELS[app.status] || app.status}</td>
                   <td>
-                    <Link to={`/application/${app.id}`} className="btn btn-primary" style={{ padding: '0.35rem 0.75rem' }}>
+                    <Button to={`/application/${app.id}`} variant="primary" size="sm" style={{ padding: '0.35rem 0.75rem' }}>
                       Review
-                    </Link>
+                    </Button>
                   </td>
                 </tr>
               ))}

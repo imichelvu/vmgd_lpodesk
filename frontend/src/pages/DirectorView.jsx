@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
+import Button from '../components/Button';
 
 export default function DirectorView() {
   const { request } = useApi();
@@ -48,9 +49,9 @@ export default function DirectorView() {
                   <td>{app.start_date}</td>
                   <td>{app.total_working_days}</td>
                   <td>
-                    <Link to={`/application/${app.id}`} className="btn btn-primary" style={{ padding: '0.35rem 0.75rem' }}>
+                    <Button to={`/application/${app.id}`} variant="primary" size="sm" style={{ padding: '0.35rem 0.75rem' }}>
                       Sign off
-                    </Link>
+                    </Button>
                   </td>
                 </tr>
               ))}

@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ROLE_IDS } from '../context/AuthContext';
 import { useApi } from '../hooks/useApi';
-import SignaturePad from '../components/SignaturePad';
+import SignatureField from '../components/SignatureField';
+import Button from '../components/Button';
 
 const STATUS_LABELS = {
   Pending_PSO: 'Pending Superior',
@@ -137,12 +138,8 @@ export default function ApplicationDetail() {
           <h3 style={{ marginTop: 0 }}>Approve / Disapprove</h3>
           {action === null ? (
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <button type="button" className="btn btn-primary" onClick={() => setAction('approve')}>
-                Approve
-              </button>
-              <button type="button" className="btn btn-danger" onClick={() => setAction('disapprove')}>
-                Disapprove
-              </button>
+              <Button type="button" variant="primary" onClick={() => setAction('approve')}>Approve</Button>
+              <Button type="button" variant="danger" onClick={() => setAction('disapprove')}>Disapprove</Button>
             </div>
           ) : (
             <>
@@ -152,32 +149,35 @@ export default function ApplicationDetail() {
                   <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} required />
                 </div>
               )}
-              <div className="form-group">
-                <h4 className="section-title section-title-sm" style={{ marginBottom: 8 }}>Your signature (required)</h4>
-                <p className="card-subtitle" style={{ marginTop: -4, marginBottom: 8 }}>Sign below before confirming.</p>
-                <SignaturePad
+              <div>
+                <SignatureField
+                  label="Your signature (required)"
+                  hint="Sign below before confirming."
+                  required
                   width={320}
                   height={120}
-                  onSave={setApproverSignature}
-                  savedData={approverSignature}
+                  value={approverSignature}
+                  onChange={setApproverSignature}
                 />
               </div>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <button
+                <Button
                   type="button"
-                  className="btn btn-primary"
-                  disabled={actionLoading || !approverSignature || (action === 'disapprove' && !comment.trim())}
+                  variant="primary"
+                  disabled={!approverSignature || (action === 'disapprove' && !comment.trim())}
+                  loading={actionLoading}
+                  loadingText="Processing..."
                   onClick={() => handleAction(action)}
                 >
-                  {actionLoading ? 'Processing...' : action === 'approve' ? 'Approve' : 'Disapprove'}
-                </button>
-                <button
+                  {action === 'approve' ? 'Approve' : 'Disapprove'}
+                </Button>
+                <Button
                   type="button"
-                  className="btn btn-secondary"
+                  variant="secondary"
                   onClick={() => { setAction(null); setComment(''); setApproverSignature(null); }}
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </>
           )}

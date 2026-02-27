@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Button from '../components/Button';
+import AuthCardLayout from '../components/AuthCardLayout';
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() || '/api';
 
@@ -28,19 +30,15 @@ export default function ResetPassword() {
 
   if (!token.trim()) {
     return (
-      <div className="login-page">
-        <div className="card login-card">
-          <div className="login-card-header">
-            <h1 className="login-title">{getAppName()}</h1>
-            <p className="login-subtitle">Invalid reset link</p>
-          </div>
+      <AuthCardLayout title={getAppName()} subtitle="Invalid reset link" showLogo={false}>
           <div className="login-form">
             <div className="alert alert-danger">This password reset link is invalid or has expired. Please request a new one.</div>
-            <Link to="/forgot-password" className="btn btn-primary" style={{ width: '100%' }}>Request new link</Link>
+            <Button to="/forgot-password" variant="primary" fullWidth>
+              Request new link
+            </Button>
             <p className="login-forgot-wrap"><Link to="/login" className="login-forgot-link">Back to sign in</Link></p>
           </div>
-        </div>
-      </div>
+      </AuthCardLayout>
     );
   }
 
@@ -77,35 +75,21 @@ export default function ResetPassword() {
 
   if (success) {
     return (
-      <div className="login-page">
-        <div className="card login-card">
-          <div className="login-card-header">
-            <h1 className="login-title">{getAppName()}</h1>
-            <p className="login-subtitle">Password reset</p>
-          </div>
+      <AuthCardLayout title={getAppName()} subtitle="Password reset" showLogo={false}>
           <div className="login-form">
             <div className="alert alert-success" style={{ marginBottom: 16 }}>
               Your password has been reset. You can now sign in with your new password.
             </div>
-            <button type="button" className="btn btn-primary" style={{ width: '100%' }} onClick={() => navigate('/login')}>
+            <Button type="button" variant="primary" fullWidth onClick={() => navigate('/login')}>
               Sign in
-            </button>
+            </Button>
           </div>
-        </div>
-      </div>
+      </AuthCardLayout>
     );
   }
 
   return (
-    <div className="login-page">
-      <div className="card login-card">
-        <div className="login-card-header">
-          <div className="login-logo-wrap">
-            <img src="/vmgd-logo.png" alt="VMGD logo" className="login-logo" />
-          </div>
-          <h1 className="login-title">{getAppName()}</h1>
-          <p className="login-subtitle">Set a new password</p>
-        </div>
+    <AuthCardLayout title={getAppName()} subtitle="Set a new password">
         <form onSubmit={handleSubmit} className="login-form">
           {error && <div className="alert alert-danger">{error}</div>}
           <div className="form-group">
@@ -134,14 +118,13 @@ export default function ResetPassword() {
               placeholder="Re-enter your new password"
             />
           </div>
-          <button type="submit" className="btn btn-primary login-submit" disabled={loading}>
-            {loading ? 'Resetting…' : 'Reset password'}
-          </button>
+          <Button type="submit" variant="primary" className="login-submit" loading={loading} loadingText="Resetting…">
+            Reset password
+          </Button>
           <p className="login-forgot-wrap">
             <Link to="/login" className="login-forgot-link">Back to sign in</Link>
           </p>
         </form>
-      </div>
-    </div>
+    </AuthCardLayout>
   );
 }

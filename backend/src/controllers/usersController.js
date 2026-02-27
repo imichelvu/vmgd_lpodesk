@@ -24,6 +24,52 @@ const AD_OU_TO_DIVISION = {
   'OU=Observation_OU,DC=vmgd,DC=gov,DC=vu': 'Observations',
 };
 
+const AD_IMPORT_DEFAULT_DOMAIN = 'meteo.gov.vu';
+const AD_IMPORT_GEO_DOMAIN = 'vanuatu.gov.vu';
+const DEFAULT_MINISTRY = 'MOCCA';
+const NON_HUMAN_NAME_KEYWORDS = [
+  'admin',
+  'administrator',
+  'service',
+  'svc',
+  'system',
+  'test',
+  'backup',
+  'sql',
+  'mail',
+  'printer',
+  'scanner',
+  'noreply',
+  'helpdesk',
+  'support',
+];
+
+function resolveImportedEmail({ email, username, division_name }) {
+  const localPartFromEmail = email && String(email).includes('@')
+    ? String(email).split('@')[0].trim().toLowerCase()
+    : '';
+  const localPartFromUsername = username ? String(username).trim().toLowerCase() : '';
+  const localPart = localPartFromEmail || localPartFromUsername;
+  if (!localPart) return null;
+  const domain = division_name === 'Geo-Hazards' ? AD_IMPORT_GEO_DOMAIN : AD_IMPORT_DEFAULT_DOMAIN;
+  return `${localPart}@${domain}`;
+}
+
+function isLikelyHumanName(name) {
+  if (!name) return false;
+  const raw = String(name).trim();
+  if (raw.length < 3) return false;
+  if (/\d/.test(raw)) return false;
+
+  const lower = raw.toLowerCase();
+  if (NON_HUMAN_NAME_KEYWORDS.some((kw) => lower.includes(kw))) return false;
+
+  // Require at least two alphabetic tokens (e.g., "John Doe").
+  const tokens = raw.split(/\s+/).map((t) => t.replace(/[^a-zA-Z'-]/g, '')).filter(Boolean);
+  const alphaTokens = tokens.filter((t) => /[a-zA-Z]/.test(t));
+  return alphaTokens.length >= 2;
+}
+
 function getLdapUrl() {
   const url = process.env.AD_LDAP_URL || 'ldap://192.168.60.2:389';
   return url.replace(/^ldaps?:\/\//, '').split('/')[0];
@@ -65,7 +111,8 @@ function fetchUsersFromLdap(ldapUrl, domain, bindUser, bindPassword) {
     return new Promise((resolve, reject) => {
       const entries = [];
       const opts = {
-        filter: '(&(objectClass=user)(sAMAccountName=*))',
+        // Exclude disabled AD accounts (userAccountControl bit 2 = ACCOUNTDISABLE).
+        filter: '(&(objectClass=user)(sAMAccountName=*)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))',
         scope: 'sub',
         attributes: ['displayName', 'cn', 'sAMAccountName', 'mail'],
       };
@@ -98,10 +145,12 @@ function fetchUsersFromLdap(ldapUrl, domain, bindUser, bindPassword) {
         for (const obj of list) {
           const sam = (obj.sAMAccountName && obj.sAMAccountName[0]) ? String(obj.sAMAccountName[0]).trim().toLowerCase() : null;
           if (!sam) continue;
+          if (sam.endsWith('$')) continue; // machine/computer account
           const displayName = (obj.displayName && obj.displayName[0]) ? String(obj.displayName[0]).trim() : null;
           const cn = (obj.cn && obj.cn[0]) ? String(obj.cn[0]).trim() : null;
           const mail = (obj.mail && obj.mail[0]) ? String(obj.mail[0]).trim() : null;
-          const fullName = displayName || cn || sam;
+          const fullName = displayName || cn;
+          if (!isLikelyHumanName(fullName)) continue;
           const email = (mail && mail.includes('@')) ? mail : `${sam}@${domain || 'vmgd.gov.vu'}`;
           if (!bySam.has(sam)) bySam.set(sam, { full_name: fullName, username: sam, email, division_name });
         }
@@ -187,11 +236,12 @@ export async function create(req, res) {
   }
   const password_hash = await bcrypt.hash(password, 10);
   const entryDateVal = entry_date && String(entry_date).trim() ? String(entry_date).trim() : null;
+  const ministryVal = ministry && String(ministry).trim() ? String(ministry).trim() : DEFAULT_MINISTRY;
   const { rows } = await pool.query(
     `INSERT INTO users (full_name, username, email, password_hash, vnpf_no, post_title, post_no, grade, department, ministry, entry_date, division_id, reports_to_id, source)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'local')
      RETURNING id, full_name, username, email, vnpf_no, post_title, post_no, grade, department, ministry, entry_date, division_id, reports_to_id, created_at`,
-    [full_name, usernameVal, email, password_hash, vnpf_no || null, post_title || null, post_no || null, grade || null, department || null, ministry || null, entryDateVal, division_id || null, reports_to_id || null]
+    [full_name, usernameVal, email, password_hash, vnpf_no || null, post_title || null, post_no || null, grade || null, department || null, ministryVal, entryDateVal, division_id || null, reports_to_id || null]
   );
   const user = rows[0];
   const rids = Array.isArray(role_ids) ? role_ids : (role_ids ? [role_ids] : [ROLE_IDS.Staff]);
@@ -236,7 +286,7 @@ export async function update(req, res) {
   if (post_no !== undefined) { updates.push(`post_no = $${i++}`); values.push(post_no); }
   if (grade !== undefined) { updates.push(`grade = $${i++}`); values.push(grade); }
   if (department !== undefined) { updates.push(`department = $${i++}`); values.push(department && String(department).trim() ? String(department).trim() : null); }
-  if (ministry !== undefined) { updates.push(`ministry = $${i++}`); values.push(ministry && String(ministry).trim() ? String(ministry).trim() : null); }
+  if (ministry !== undefined) { updates.push(`ministry = $${i++}`); values.push(ministry && String(ministry).trim() ? String(ministry).trim() : DEFAULT_MINISTRY); }
   if (entry_date !== undefined) { updates.push(`entry_date = $${i++}`); values.push(entry_date && String(entry_date).trim() ? String(entry_date).trim() : null); }
   if (division_id !== undefined) { updates.push(`division_id = $${i++}`); values.push(division_id); }
   if (reports_to_id !== undefined) { updates.push(`reports_to_id = $${i++}`); values.push(reports_to_id); }
@@ -348,9 +398,13 @@ export async function syncFromAd(req, res) {
     return res.status(502).json({ error: 'AD error: ' + msg });
   }
   if (dry_run) {
+    const transformedUsers = adUsers.map((u) => ({
+      ...u,
+      email: resolveImportedEmail(u) || u.email || '',
+    }));
     const { rows: existing } = await pool.query('SELECT LOWER(email) AS email FROM users');
     const existingEmails = new Set((existing || []).map((r) => r.email));
-    const notYetImported = adUsers.filter((u) => {
+    const notYetImported = transformedUsers.filter((u) => {
       const email = (u.email && String(u.email).trim()).toLowerCase();
       return email && !existingEmails.has(email);
     });
@@ -363,8 +417,9 @@ export async function syncFromAd(req, res) {
   let created = 0;
   let updated = 0;
   for (const u of adUsers) {
-    if (!u.email || !u.full_name) continue;
-    const emailNorm = u.email.trim().toLowerCase();
+    const importedEmail = resolveImportedEmail(u);
+    if (!importedEmail || !u.full_name) continue;
+    const emailNorm = importedEmail.trim().toLowerCase();
     const division_id = (u.division_name && divisionIdsByName[u.division_name]) ? divisionIdsByName[u.division_name] : null;
     const { rows: existing } = await pool.query(
       "SELECT id, COALESCE(source, 'local') AS source FROM users WHERE LOWER(email) = $1",
@@ -373,17 +428,17 @@ export async function syncFromAd(req, res) {
     if (existing.length) {
       if (existing[0].source === 'local') continue;
       await pool.query(
-        'UPDATE users SET full_name = $1, username = $2, division_id = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
-        [u.full_name, u.username, division_id, existing[0].id]
+        'UPDATE users SET full_name = $1, username = $2, division_id = $3, ministry = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5',
+        [u.full_name, u.username, division_id, DEFAULT_MINISTRY, existing[0].id]
       );
       updated += 1;
     } else {
       try {
         const { rows: inserted } = await pool.query(
-          `INSERT INTO users (full_name, username, email, password_hash, division_id, source, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, 'ad_import', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          `INSERT INTO users (full_name, username, email, password_hash, division_id, ministry, source, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, 'ad_import', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
            RETURNING id`,
-          [u.full_name, u.username, u.email, defaultPasswordHash, division_id]
+          [u.full_name, u.username, importedEmail, defaultPasswordHash, division_id, DEFAULT_MINISTRY]
         );
         if (inserted.length) {
           await pool.query('INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [inserted[0].id, ROLE_IDS.Staff]);
@@ -417,10 +472,10 @@ export async function importAdUsers(req, res) {
   let updated = 0;
   for (const u of list) {
     const full_name = u.full_name && String(u.full_name).trim();
-    const email = u.email && String(u.email).trim();
     const username = (u.username && String(u.username).trim().toLowerCase()) || null;
-    if (!full_name || !email) continue;
-    const emailNorm = email.toLowerCase();
+    const importedEmail = resolveImportedEmail({ ...u, username });
+    if (!full_name || !importedEmail) continue;
+    const emailNorm = importedEmail.toLowerCase();
     const division_id = (u.division_name && divisionIdsByName[u.division_name]) ? divisionIdsByName[u.division_name] : null;
     const { rows: existing } = await pool.query(
       "SELECT id, COALESCE(source, 'local') AS source FROM users WHERE LOWER(email) = $1",
@@ -429,17 +484,17 @@ export async function importAdUsers(req, res) {
     if (existing.length) {
       if (existing[0].source === 'local') continue;
       await pool.query(
-        'UPDATE users SET full_name = $1, username = $2, division_id = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
-        [full_name, username, division_id, existing[0].id]
+        'UPDATE users SET full_name = $1, username = $2, division_id = $3, ministry = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5',
+        [full_name, username, division_id, DEFAULT_MINISTRY, existing[0].id]
       );
       updated += 1;
     } else {
       try {
         const { rows: inserted } = await pool.query(
-          `INSERT INTO users (full_name, username, email, password_hash, division_id, source, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, 'ad_import', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          `INSERT INTO users (full_name, username, email, password_hash, division_id, ministry, source, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, 'ad_import', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
            RETURNING id`,
-          [full_name, username, email, defaultPasswordHash, division_id]
+          [full_name, username, importedEmail, defaultPasswordHash, division_id, DEFAULT_MINISTRY]
         );
         if (inserted.length) {
           await pool.query('INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [inserted[0].id, ROLE_IDS.Staff]);

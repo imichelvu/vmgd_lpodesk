@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ROLE_IDS } from '../context/AuthContext';
 import { useApi } from '../hooks/useApi';
+import Button from '../components/Button';
 
 const STATUS_LABELS = {
   Pending_PSO: 'Pending Superior',
@@ -34,7 +35,7 @@ export default function Dashboard() {
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <h3 style={{ margin: 0 }}>My leave applications</h3>
-            <Link to="/apply" className="btn btn-primary">New application</Link>
+            <Button to="/apply" variant="primary">New application</Button>
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
             View status of your applications. Use “New application” to submit PSC Form 4-9.
@@ -82,13 +83,13 @@ export default function Dashboard() {
 
       <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '1rem' }}>
         {hasRole([ROLE_IDS.PSO, ROLE_IDS.Manager]) && (
-          <Link to="/supervisor" className="btn btn-secondary">Go to Approvals</Link>
+          <Button to="/supervisor" variant="secondary">Go to Approvals</Button>
         )}
         {hasRole(ROLE_IDS.Director) && (
-          <Link to="/director" className="btn btn-secondary">Director view</Link>
+          <Button to="/director" variant="secondary">Director view</Button>
         )}
         {hasRole(ROLE_IDS.Admin) && (
-          <Link to="/admin" className="btn btn-secondary">Admin</Link>
+          <Button to="/admin" variant="secondary">Admin</Button>
         )}
       </div>
     </>

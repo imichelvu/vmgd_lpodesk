@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Button from '../components/Button';
+import AuthCardLayout from '../components/AuthCardLayout';
 
 function getAppName() {
   return (import.meta.env.VITE_APP_NAME ?? '').trim();
@@ -67,15 +69,7 @@ export default function Login() {
   };
 
   return (
-    <div className="login-page">
-      <div className="card login-card">
-        <div className="login-card-header">
-          <div className="login-logo-wrap">
-            <img src="/vmgd-logo.png" alt="VMGD logo" className="login-logo" />
-          </div>
-          <h1 className="login-title">{getAppName()}</h1>
-          <p className="login-subtitle">Sign in to your account</p>
-        </div>
+    <AuthCardLayout title={getAppName()} subtitle="Sign in to your account">
         <form onSubmit={handleSubmit} className="login-form">
           {error && <div className="alert alert-danger">{error}</div>}
           <div className="form-group">
@@ -102,31 +96,39 @@ export default function Login() {
               placeholder="Enter your password"
             />
           </div>
-          <button type="submit" className="btn btn-primary login-submit" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign in'}
-          </button>
+          <Button type="submit" variant="primary" className="login-submit" loading={loading} loadingText="Signing in...">
+            Sign in
+          </Button>
           <p className="login-forgot-wrap">
             <Link to="/forgot-password" className="login-forgot-link">Forgot password?</Link>
           </p>
         </form>
 
         <div className="login-troubleshoot">
-          <button
+          <Button
             type="button"
-            className="btn btn-secondary"
-            style={{ width: '100%', marginBottom: troubleshootOpen ? 12 : 0 }}
+            variant="secondary"
+            fullWidth
+            style={{ marginBottom: troubleshootOpen ? 12 : 0 }}
             onClick={() => { setTroubleshootOpen((o) => !o); if (!troubleshootOpen) setTroubleshootResult(null); }}
           >
             {troubleshootOpen ? 'Hide troubleshoot' : 'Troubleshoot'}
-          </button>
+          </Button>
           {troubleshootOpen && (
             <div className="troubleshoot-content">
               <p className="card-subtitle" style={{ marginBottom: 8 }}>
                 API base: <code>{apiBase}</code>
               </p>
-              <button type="button" className="btn btn-secondary" style={{ marginBottom: 12 }} onClick={runTroubleshoot} disabled={troubleshootLoading}>
-                {troubleshootLoading ? 'Checking...' : 'Check backend'}
-              </button>
+              <Button
+                type="button"
+                variant="secondary"
+                style={{ marginBottom: 12 }}
+                onClick={runTroubleshoot}
+                loading={troubleshootLoading}
+                loadingText="Checking..."
+              >
+                Check backend
+              </Button>
               {troubleshootResult && (
                 <pre className="troubleshoot-pre">
                   {JSON.stringify(troubleshootResult, null, 2)}
@@ -135,7 +137,6 @@ export default function Login() {
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </AuthCardLayout>
   );
 }

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Button from '../components/Button';
+import AuthCardLayout from '../components/AuthCardLayout';
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() || '/api';
 
@@ -47,21 +49,15 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="login-page">
-      <div className="card login-card">
-        <div className="login-card-header">
-          <div className="login-logo-wrap">
-            <img src="/vmgd-logo.png" alt="VMGD logo" className="login-logo" />
-          </div>
-          <h1 className="login-title">{getAppName()}</h1>
-          <p className="login-subtitle">Reset your password</p>
-        </div>
+    <AuthCardLayout title={getAppName()} subtitle="Reset your password">
         {sent ? (
           <div className="login-form">
             <div className="alert alert-success" style={{ marginBottom: 16 }}>
               If an account exists with that email, we&apos;ve sent a password reset link. Please check your inbox (and spam folder).
             </div>
-            <Link to="/login" className="btn btn-primary" style={{ width: '100%' }}>Back to sign in</Link>
+            <Button to="/login" variant="primary" fullWidth>
+              Back to sign in
+            </Button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="login-form">
@@ -78,15 +74,14 @@ export default function ForgotPassword() {
                 placeholder="Enter your email"
               />
             </div>
-            <button type="submit" className="btn btn-primary login-submit" disabled={loading}>
-              {loading ? 'Sending…' : 'Send reset link'}
-            </button>
+            <Button type="submit" variant="primary" className="login-submit" loading={loading} loadingText="Sending…">
+              Send reset link
+            </Button>
             <p className="login-forgot-wrap">
               <Link to="/login" className="login-forgot-link">Back to sign in</Link>
             </p>
           </form>
         )}
-      </div>
-    </div>
+    </AuthCardLayout>
   );
 }
