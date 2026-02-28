@@ -1,3 +1,8 @@
+/**
+ * Author: Igor Michel
+ * Purpose: Handle leave application creation, listing, approvals, and notifications.
+ * Last updated: 2026-02-28
+ */
 import pool from '../db/pool.js';
 import { LEAVE_STATUS } from '../constants/roles.js';
 import { notifyUser, getNextApprover, getPendingPsoApprovers, notifyApplicant } from '../helpers/notifications.js';
@@ -113,9 +118,11 @@ export async function listForDirector(req, res) {
 export async function getById(req, res) {
   const { id } = req.params;
   const { rows } = await pool.query(
-    `SELECT la.*, u.full_name as applicant_name, u.email as applicant_email, u.vnpf_no, u.post_title, u.post_no, u.grade,
+    `SELECT la.*, u.full_name as applicant_name, u.email as applicant_email, u.vnpf_no, u.post_title, u.post_no, u.grade, u.department, u.ministry, u.entry_date,
             d.name as division_name,
-            pso.full_name as approved_by_pso_name, mgr.full_name as approved_by_manager_name, dir.full_name as approved_by_director_name
+            pso.full_name as approved_by_pso_name, mgr.full_name as approved_by_manager_name, dir.full_name as approved_by_director_name,
+            COALESCE((SELECT array_agg(ur.role_id) FROM user_roles ur WHERE ur.user_id = la.approved_by_pso_id), ARRAY[]::int[]) as approved_by_pso_role_ids,
+            COALESCE((SELECT array_agg(ur.role_id) FROM user_roles ur WHERE ur.user_id = la.approved_by_manager_id), ARRAY[]::int[]) as approved_by_manager_role_ids
      FROM leave_applications la
      JOIN users u ON u.id = la.applicant_id
      LEFT JOIN divisions d ON d.id = u.division_id
@@ -183,7 +190,13 @@ export async function approveOrDisapprove(req, res) {
       return res.json({ message: 'Disapproved', status: LEAVE_STATUS.Disapproved });
     }
     await pool.query(
-      `UPDATE leave_applications SET status = $1, approved_by_pso_id = $2, pso_signature_data = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4`,
+      `UPDATE leave_applications
+       SET status = $1,
+           approved_by_pso_id = $2,
+           pso_signature_data = $3,
+           pso_approved_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4`,
       [LEAVE_STATUS.Pending_Director, user.id, signatureValue, id]
     );
     const next = await getNextApprover(id);
@@ -213,7 +226,13 @@ export async function approveOrDisapprove(req, res) {
       return res.json({ message: 'Disapproved', status: LEAVE_STATUS.Disapproved });
     }
     await pool.query(
-      `UPDATE leave_applications SET status = $1, approved_by_manager_id = $2, manager_signature_data = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4`,
+      `UPDATE leave_applications
+       SET status = $1,
+           approved_by_manager_id = $2,
+           manager_signature_data = $3,
+           manager_approved_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4`,
       [LEAVE_STATUS.Pending_Director, user.id, signatureValue, id]
     );
     const next = await getNextApprover(id);
@@ -243,7 +262,13 @@ export async function approveOrDisapprove(req, res) {
       return res.json({ message: 'Disapproved', status: LEAVE_STATUS.Disapproved });
     }
     await pool.query(
-      `UPDATE leave_applications SET status = $1, approved_by_director_id = $2, director_signature_data = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4`,
+      `UPDATE leave_applications
+       SET status = $1,
+           approved_by_director_id = $2,
+           director_signature_data = $3,
+           director_approved_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4`,
       [LEAVE_STATUS.Approved, user.id, signatureValue, id]
     );
     await notifyApplicant(

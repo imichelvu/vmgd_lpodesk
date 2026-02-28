@@ -17,7 +17,13 @@ const LEAVE_TYPES = [
 
 const HALF_DAY_DEFAULT = { start: '08:00', end: '12:00' };
 
-export default function PSCForm49({ onSubmit, loading, initialValues, onFormChange }) {
+export default function PSCForm49({
+  onSubmit,
+  loading,
+  initialValues,
+  onFormChange,
+  destinationSuggestions = [],
+}) {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [leave_type, setLeaveType] = useState(initialValues?.leave_type || '');
   const [destination, setDestination] = useState(initialValues?.destination || '');
@@ -168,7 +174,17 @@ export default function PSCForm49({ onSubmit, loading, initialValues, onFormChan
             value={destination}
             onChange={(e) => setDestination(e.target.value)}
             placeholder="e.g. Home island, Port Vila"
+            list="destination-suggestions"
+            autoComplete="off"
           />
+          {destinationSuggestions.length > 0 ? (
+            <datalist id="destination-suggestions">
+              {destinationSuggestions.map((value) => (
+                <option key={value} value={value} />
+              ))}
+            </datalist>
+          ) : null}
+          <span className="form-hint">Start typing to search from previous destinations.</span>
         </div>
         <div className="form-group">
           <label>

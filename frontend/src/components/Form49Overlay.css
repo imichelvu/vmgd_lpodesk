@@ -1,5 +1,8 @@
 /**
+ * Author: Igor Michel
  * Form 4-9 overlay preview – form image + positioned text (from overlay.html).
+ * Purpose: Position overlay fields, signatures, and approval markers on form image.
+ * Last updated: 2026-02-28
  * Tweak --top-offset and field positions here; IDs match overlay.html.
  */
 
@@ -48,8 +51,14 @@
 .form49-overlay-preview #totalnumleave { left: 480px; top: 400px; }
 .form49-overlay-preview #staffsig { left: 315px; top: calc(460px - var(--top-offset)); }
 .form49-overlay-preview #staffsigdt { left: 660px; top: calc(480px - var(--top-offset)); }
-.form49-overlay-preview #supsig { left: 660px; top: calc(495px - var(--top-offset)); }
-.form49-overlay-preview #supsigdt { left: 660px; top: calc(495px - var(--top-offset)); }
+.form49-overlay-preview #remarks { left: 170px; top: calc(560px - var(--top-offset)); max-width: 560px; }
+.form49-overlay-preview #supsig { left: 280px; top: calc(525px - var(--top-offset)); }
+.form49-overlay-preview #supname { left: 400px; top: calc(555px - var(--top-offset)); max-width: 220px; }
+.form49-overlay-preview #supsigdt { left: 660px; top: calc(530px - var(--top-offset)); }
+.form49-overlay-preview #leave-approved { left: 0; top: 0; }
+.form49-overlay-preview #directorname { left: 220px; top: calc(735px - var(--top-offset)); max-width: 230px; }
+.form49-overlay-preview #directorsig { left: 600px; top: calc(715px - var(--top-offset)); }
+.form49-overlay-preview #directorsigdt { left: 660px; top: calc(670px - var(--top-offset)); }
 .form49-overlay-preview #advance-pay-date { left: 600px; top: 435px; }
 
 
@@ -69,6 +78,25 @@
 .form49-overlay-preview #advance .yes { left: 375px; top: -725px;}
 .form49-overlay-preview #advance .no { left: 425px; top: -725px; }
 
+.form49-overlay-preview #leave-approved .yes,
+.form49-overlay-preview #leave-approved .no {
+  position: absolute;
+  display: block;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 4px solid #0078d4;
+  background: transparent !important;
+  box-sizing: border-box;
+  z-index: 160;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* Director section: LEAVE APPROVED YES/NO */
+.form49-overlay-preview #leave-approved .yes { left: 210px; top: calc(665px - var(--top-offset)); }
+.form49-overlay-preview #leave-approved .no { left: 238px; top: calc(665px - var(--top-offset)); }
+
 .form49-overlay-preview .form49-overlay-sig-img {
   display: block;
   max-height: 96px;
@@ -76,6 +104,6 @@
   width: auto;
   height: auto;
   object-fit: contain;
-  mix-blend-mode: multiply;
+  background: transparent;
 }
 

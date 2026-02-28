@@ -1,4 +1,9 @@
-import React from 'react';
+/**
+ * Author: Igor Michel
+ * Purpose: Render PSC Form 4-9 image overlay with dynamic fields and signatures.
+ * Last updated: 2026-02-28
+ */
+import React, { useEffect, useState } from 'react';
 import './Form49Overlay.css';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -26,6 +31,90 @@ function formatDDMMMYYYY(str) {
   return `${day} ${MONTHS[monthIdx]} ${y}`;
 }
 
+function normalizeSignatureData(rawValue) {
+  if (!rawValue) return '';
+  if (typeof rawValue === 'string') {
+    const trimmed = rawValue.trim();
+    if (trimmed.startsWith('data:')) return trimmed;
+    // Legacy rows may store JSON-encoded strings.
+    try {
+      const parsed = JSON.parse(trimmed);
+      return typeof parsed === 'string' && parsed.startsWith('data:') ? parsed : '';
+    } catch (_) {
+      return '';
+    }
+  }
+  if (typeof rawValue === 'object') {
+    const maybeDataUrl = rawValue.dataUrl || rawValue.value || rawValue.signature;
+    return typeof maybeDataUrl === 'string' && maybeDataUrl.startsWith('data:') ? maybeDataUrl : '';
+  }
+  return '';
+}
+
+function useTransparentSignatureData(dataUrl) {
+  const [processedDataUrl, setProcessedDataUrl] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!dataUrl) {
+      setProcessedDataUrl('');
+      return () => { cancelled = true; };
+    }
+
+    if (!String(dataUrl).startsWith('data:image')) {
+      setProcessedDataUrl(dataUrl);
+      return () => { cancelled = true; };
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) throw new Error('2D context unavailable');
+
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const pixels = imageData.data;
+
+        // Remove white/light background pixels while preserving ink strokes.
+        for (let i = 0; i < pixels.length; i += 4) {
+          const r = pixels[i];
+          const g = pixels[i + 1];
+          const b = pixels[i + 2];
+          const a = pixels[i + 3];
+          if (a === 0) continue;
+
+          if (r > 248 && g > 248 && b > 248) {
+            pixels[i + 3] = 0;
+          } else if (r > 238 && g > 238 && b > 238) {
+            pixels[i + 3] = Math.min(a, 30);
+          }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        const cleaned = canvas.toDataURL('image/png');
+        if (!cancelled) setProcessedDataUrl(cleaned);
+      } catch (_) {
+        if (!cancelled) setProcessedDataUrl(dataUrl);
+      }
+    };
+    img.onerror = () => {
+      if (!cancelled) setProcessedDataUrl(dataUrl);
+    };
+    img.src = dataUrl;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dataUrl]);
+
+  return processedDataUrl || dataUrl || '';
+}
+
 /**
  * PSC Form 4-9 preview: form image + absolutely positioned overlay text.
  * Matches overlay.html structure and IDs so your manual positions apply.
@@ -49,9 +138,25 @@ export default function Form49Overlay({ user, formData }) {
   const totalnumleave = formData?.total_working_days != null ? String(formData.total_working_days) : '';
   const advancePay = formData?.advance_pay;
   const advancePayDate = formData?.advance_pay_date ? formatDDMMMYYYY(formData.advance_pay_date) : '';
-  const signatureData = formData?.signature_data;
-  const hasSignature = typeof signatureData === 'string' && signatureData.startsWith('data:');
-  const staffsigdt = hasSignature ? formatDDMMMYYYY(new Date().toISOString().slice(0, 10)) : '';
+  const remarks = formData?.reason_or_remarks || '';
+
+  const signatureData = normalizeSignatureData(formData?.signature_data);
+  const transparentStaffSignatureData = useTransparentSignatureData(signatureData);
+  const hasSignature = !!signatureData;
+  const staffsigdt = hasSignature ? formatDDMMMYYYY(formData?.created_at || new Date().toISOString().slice(0, 10)) : '';
+
+  const supervisorSignatureData = normalizeSignatureData(formData?.manager_signature_data || formData?.pso_signature_data);
+  const transparentSupervisorSignatureData = useTransparentSignatureData(supervisorSignatureData);
+  const hasSupervisorSignature = !!supervisorSignatureData;
+  const supervisorName = formData?.approved_by_manager_name || formData?.approved_by_pso_name || '';
+
+  const directorSignatureData = normalizeSignatureData(formData?.director_signature_data);
+  const transparentDirectorSignatureData = useTransparentSignatureData(directorSignatureData);
+  const hasDirectorSignature = !!directorSignatureData;
+  const directorName = formData?.approved_by_director_name || '';
+  const directorSigDate = hasDirectorSignature ? formatDDMMMYYYY(formData?.updated_at || '') : '';
+
+  const approvedDecision = formData?.status === 'Approved' ? 'yes' : (formData?.status === 'Disapproved' ? 'no' : '');
 
   return (
     <div className="form49-overlay-preview">
@@ -79,6 +184,7 @@ export default function Form49Overlay({ user, formData }) {
           {isHalfDay && halfEnd ? `${lastleavedt} ${halfEnd}` : lastleavedt}
         </p>
         <p className="pscformtext" id="totalnumleave">{totalnumleave}</p>
+        <p className="pscformtext" id="remarks">{remarks}</p>
         <div id="advance" className="pscformtext form49-advance-wrap">
           {advancePay ? <span className="yes">YES</span> : null}
           {!advancePay && advancePay !== undefined ? <span className="no">NO</span> : null}
@@ -86,12 +192,28 @@ export default function Form49Overlay({ user, formData }) {
         <p className="pscformtext" id="advance-pay-date">{advancePayDate}</p>
         <p className="pscformtext" id="staffsig">
           {hasSignature ? (
-            <img src={signatureData} alt="Signature" className="form49-overlay-sig-img" />
+            <img src={transparentStaffSignatureData} alt="Signature" className="form49-overlay-sig-img" />
           ) : null}
         </p>
         <p className="pscformtext" id="staffsigdt">{staffsigdt}</p>
-        <p className="pscformtext" id="supsig" />
+        <p className="pscformtext" id="supsig">
+          {hasSupervisorSignature ? (
+            <img src={transparentSupervisorSignatureData} alt="Supervisor signature" className="form49-overlay-sig-img" />
+          ) : null}
+        </p>
+        <p className="pscformtext" id="supname">{supervisorName}</p>
         <p className="pscformtext" id="supsigdt" />
+        <div id="leave-approved" className="pscformtext form49-approval-wrap">
+          {approvedDecision === 'yes' ? <span className="yes" /> : null}
+          {approvedDecision === 'no' ? <span className="no" /> : null}
+        </div>
+        <p className="pscformtext" id="directorname">{directorName}</p>
+        <p className="pscformtext" id="directorsig">
+          {hasDirectorSignature ? (
+            <img src={transparentDirectorSignatureData} alt="Director signature" className="form49-overlay-sig-img" />
+          ) : null}
+        </p>
+        <p className="pscformtext" id="directorsigdt">{directorSigDate}</p>
       </div>
     </div>
   );

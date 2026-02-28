@@ -289,6 +289,41 @@ tr:hover td { background: var(--surface-hover); }
   margin-bottom: 4px;
 }
 
+/* Application status badge */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.status-badge-default {
+  background: var(--bg-subtle);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.status-badge-success {
+  background: var(--success-soft);
+  color: #107c10;
+  border-color: var(--success);
+}
+
+.status-badge-danger {
+  background: var(--danger-soft);
+  color: #a4262c;
+  border-color: var(--danger);
+}
+
+.status-badge-warning {
+  background: var(--warning-soft);
+  color: #8a5a00;
+  border-color: var(--warning);
+}
+
 .badge-group { display: flex; flex-wrap: wrap; gap: 4px; }
 .actions-cell { display: flex; align-items: center; gap: 8px; }
 .actions-cell .btn { padding: 6px 12px; font-size: 13px; }
@@ -315,6 +350,42 @@ tr:hover td { background: var(--surface-hover); }
 .form-actions .btn { min-height: 40px; padding: 10px 20px; }
 .card-subtitle { color: var(--text-muted); font-size: 14px; margin: -4px 0 16px 0; line-height: 1.45; }
 .card.card-danger { border-color: var(--danger); background: var(--danger-soft); }
+
+/* Shared page header */
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.page-header-copy {
+  min-width: 0;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.page-subtitle {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
 /* Dashboard metrics and helpers */
 .dashboard-section-title-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }

@@ -260,3 +260,85 @@
   padding-top: 6px;
 }
 
+/* Printable approved form view */
+.print-page-content {
+  width: 100%;
+  max-width: 860px;
+}
+
+.print-page-content .form49-preview {
+  max-width: 800px;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  html, body {
+    width: 210mm;
+    height: 297mm;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .app-header,
+  .app-sidebar,
+  .sidebar-backdrop,
+  .print-form-actions {
+    display: none !important;
+  }
+
+  .app-layout {
+    display: block !important;
+    min-height: auto;
+  }
+
+  .app-main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+  }
+
+  .print-page {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .print-page-content,
+  .print-page-content .form49-preview,
+  .print-page-content .form49-overlay-preview {
+    max-width: none !important;
+    width: 100% !important;
+  }
+
+  .print-page-content {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Keep original overlay coordinates and scale full form to A4 evenly */
+  .print-page-content .print-fit-frame {
+    width: 800px;
+    margin: 0 auto;
+    zoom: 92%;
+  }
+
+  .print-page-content .print-fit-frame .form49-overlay-preview {
+    width: 800px !important;
+    max-width: 800px !important;
+  }
+
+  @supports not (zoom: 1) {
+    .print-page-content .print-fit-frame {
+      zoom: 1;
+      transform: scale(0.92);
+      transform-origin: top center;
+    }
+  }
+}
+

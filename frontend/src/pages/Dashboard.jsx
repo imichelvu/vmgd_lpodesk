@@ -7,12 +7,13 @@ import { useRequestList } from '../hooks/useRequestList';
 import { usePagination } from '../hooks/usePagination';
 import Button from '../components/Button';
 import StatsRow from '../components/StatsRow';
+import PageHeader from '../components/PageHeader';
 import { toApplicationStatusLabel } from '../constants/applicationStatus';
 
 export default function Dashboard() {
   const { user, hasRole } = useAuth();
   const { request } = useApi();
-  const { list: applications } = useRequestList(request, '/leave/mine', []);
+  const { list: applications, loading, error } = useRequestList(request, '/leave/mine', []);
   const {
     page,
     setPage,
@@ -41,27 +42,35 @@ export default function Dashboard() {
 
   return (
     <>
-      <h2>Dashboard</h2>
-      <p className="text-muted">Welcome, {user?.full_name}.</p>
+      <PageHeader
+        title="Dashboard"
+        subtitle={`Welcome, ${user?.full_name}.`}
+      />
 
       <StatsRow items={stats} />
 
-      {hasRole(ROLE_IDS.Staff) && (
-        <div className="card">
-          <div className="dashboard-section-title-row">
-            <h3 className="dashboard-section-title">My leave applications</h3>
-            <Button to="/apply" variant="primary">New application</Button>
-          </div>
-          <p className="text-muted dashboard-helper-text">
-            View status of your applications. Use “New application” to submit PSC Form 4-9.
-          </p>
+      {error && (
+        <div className="alert alert-danger">
+          Could not load your applications: {error}
         </div>
       )}
 
       <div className="card">
-        <h3 className="dashboard-section-title">Recent applications</h3>
-        {applications.length === 0 ? (
-          <p className="text-muted">No applications yet.</p>
+        <div className="dashboard-section-title-row">
+          <h3 className="dashboard-section-title">My leave applications</h3>
+          {hasRole(ROLE_IDS.Staff) && (
+            <Button to="/apply" variant="primary">New application</Button>
+          )}
+        </div>
+        <p className="text-muted dashboard-helper-text">
+          View status of your applications. Use “New application” to submit PSC Form 4-9.
+        </p>
+        {loading ? (
+          <p className="text-muted">Loading applications...</p>
+        ) : applications.length === 0 ? (
+          <p className="text-muted">
+            No applications found for this account yet.
+          </p>
         ) : (
           <>
             <div className="table-wrap">

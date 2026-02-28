@@ -1,0 +1,28 @@
+---
+description: Require file headers with author, purpose, and last-updated date.
+alwaysApply: true
+---
+
+# File Header Metadata Convention
+
+For new or substantially modified project files, add a short header comment near the top with:
+
+- `Author` (use explicit name when provided)
+- `Purpose` (1 concise sentence)
+- `Last updated` (ISO date `YYYY-MM-DD`)
+
+## JavaScript / JSX Example
+
+```js
+/**
+ * Author: Igor Michel
+ * Purpose: Render role-aware leave application details and actions.
+ * Last updated: 2026-02-28
+ */
+```
+
+## Notes
+
+- Keep headers concise (3-5 lines).
+- Do not add noisy line-by-line comments for obvious code.
+- Update `Last updated` when behavior changes.

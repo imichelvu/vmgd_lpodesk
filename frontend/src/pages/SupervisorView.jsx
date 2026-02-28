@@ -3,6 +3,7 @@ import { useApi } from '../hooks/useApi';
 import { useRequestList } from '../hooks/useRequestList';
 import Button from '../components/Button';
 import StatsRow from '../components/StatsRow';
+import PageHeader from '../components/PageHeader';
 import { toApplicationStatusLabel } from '../constants/applicationStatus';
 
 export default function SupervisorView() {
@@ -44,10 +45,10 @@ export default function SupervisorView() {
 
   return (
     <>
-      <h2>Approvals</h2>
-      <p className="text-muted">
-        Applications from your division requiring your approval. Acting delegations are included.
-      </p>
+      <PageHeader
+        title="Approvals"
+        subtitle="Applications from your division requiring your approval. Acting delegations are included."
+      />
       <StatsRow items={stats} />
       {list.length === 0 ? (
         <div className="card">

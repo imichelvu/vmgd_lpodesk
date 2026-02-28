@@ -1,9 +1,51 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PSCForm49 from '../components/PSCForm49';
 import Form49Preview from '../components/Form49Preview';
+import PageHeader from '../components/PageHeader';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
+
+const DESTINATION_HISTORY_KEY = 'leave.destination.history.v1';
+const MAX_DESTINATION_HISTORY = 50;
+
+function normalizeDestination(value) {
+  if (!value || typeof value !== 'string') return '';
+  return value.trim().replace(/\s+/g, ' ');
+}
+
+function mergeUniqueDestinations(items = []) {
+  const seen = new Set();
+  const merged = [];
+  for (const raw of items) {
+    const value = normalizeDestination(raw);
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(value);
+  }
+  return merged.slice(0, MAX_DESTINATION_HISTORY);
+}
+
+function readDestinationHistory() {
+  try {
+    const raw = localStorage.getItem(DESTINATION_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? mergeUniqueDestinations(parsed) : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function writeDestinationHistory(items) {
+  try {
+    localStorage.setItem(DESTINATION_HISTORY_KEY, JSON.stringify(mergeUniqueDestinations(items)));
+  } catch (_) {
+    // Ignore storage failures (private mode, quota, etc.).
+  }
+}
 
 export default function NewApplication() {
   const navigate = useNavigate();
@@ -12,6 +54,29 @@ export default function NewApplication() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [overlayData, setOverlayData] = useState(null);
+  const [destinationSuggestions, setDestinationSuggestions] = useState(() => readDestinationHistory());
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSuggestions = async () => {
+      try {
+        const history = readDestinationHistory();
+        const mine = await request('/leave/mine');
+        const fromApplications = Array.isArray(mine)
+          ? mine.map((app) => app?.destination).filter(Boolean)
+          : [];
+        const merged = mergeUniqueDestinations([...history, ...fromApplications]);
+        if (!cancelled) setDestinationSuggestions(merged);
+        writeDestinationHistory(merged);
+      } catch (_) {
+        if (!cancelled) setDestinationSuggestions(readDestinationHistory());
+      }
+    };
+
+    loadSuggestions();
+    return () => { cancelled = true; };
+  }, [request]);
 
   const handleSubmit = async (data) => {
     setLoading(true);
@@ -22,6 +87,12 @@ export default function NewApplication() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
+      const destination = normalizeDestination(data?.destination);
+      if (destination) {
+        const merged = mergeUniqueDestinations([destination, ...destinationSuggestions]);
+        setDestinationSuggestions(merged);
+        writeDestinationHistory(merged);
+      }
       navigate('/');
     } catch (e) {
       setError(e.message);
@@ -34,20 +105,26 @@ export default function NewApplication() {
     <div className="apply-page">
       <div className="apply-page-form">
         <div className="apply-page-head">
-          <h2>New leave application</h2>
-          <p style={{ color: 'var(--text-muted)' }}>Complete the form below (PSC Form 4-9).</p>
+          <PageHeader
+            title="New leave application"
+            subtitle="Complete the form below (PSC Form 4-9)."
+          />
         </div>
         {error && <div className="alert alert-danger">{error}</div>}
         <PSCForm49
           onSubmit={handleSubmit}
           loading={loading}
           onFormChange={setOverlayData}
+          destinationSuggestions={destinationSuggestions}
         />
       </div>
       <aside className="apply-page-preview" aria-label="Form 4-9 preview">
         <div className="apply-page-head apply-page-preview-head" aria-hidden="true">
-          <h2>Preview</h2>
-          <p style={{ color: 'var(--text-muted)', visibility: 'hidden' }}>Complete the form below (PSC Form 4-9).</p>
+          <PageHeader
+            title="Preview"
+            subtitle="Complete the form below (PSC Form 4-9)."
+            className="apply-preview-title"
+          />
         </div>
         <Form49Preview user={user} formData={overlayData} />
       </aside>

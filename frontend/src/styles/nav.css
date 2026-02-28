@@ -1,45 +1,56 @@
-/* ==========================
-   Header navigation behaviors
-   ========================== */
+/* ============================
+   Sidebar navigation behaviors
+   ============================ */
 
 .app-nav {
   display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  flex: 1;
 }
 
 .app-nav-links {
   display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
 }
 
 .app-nav-user {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-strong);
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
-  margin-left: auto;
-  padding-left: 16px;
-  border-left: 1px solid var(--border);
 }
 
 .app-user {
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 500;
-  padding: 4px 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .nav-link {
-  padding: 8px 14px;
-  border-radius: var(--radius-sm);
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
   color: var(--text-muted);
-  font-size: 14px;
-  font-weight: 500;
-  transition: background 0.15s, color 0.15s;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: background 0.18s, color 0.18s, border-color 0.18s, transform 0.12s, box-shadow 0.18s;
   text-decoration: none;
+  position: relative;
 }
 
 .nav-link:focus-visible {
@@ -49,33 +60,42 @@
 
 .nav-link:hover {
   color: var(--text);
-  background: var(--surface-hover);
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+  transform: translateX(2px);
   text-decoration: none;
 }
 
 .nav-link.active {
-  color: var(--accent);
-  background: var(--accent-soft);
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), #0093ff);
+  border-color: transparent;
+  box-shadow: 0 4px 10px rgba(0, 120, 212, 0.3);
   text-decoration: none;
 }
 
+.nav-link.active::before {
+  content: none;
+}
+
 .nav-logout {
-  background: none;
-  border: none;
-  padding: 6px 10px;
-  margin: 0 -4px 0 0;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 8px 12px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-muted);
   cursor: pointer;
   font-family: inherit;
   border-radius: var(--radius-sm);
-  transition: color 0.15s, background 0.15s;
+  text-align: left;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
 
 .nav-logout:hover {
   color: var(--accent);
-  background: var(--surface-hover);
+  background: rgba(0, 120, 212, 0.08);
+  border-color: rgba(0, 120, 212, 0.25);
 }
 
 .nav-logout:focus-visible {

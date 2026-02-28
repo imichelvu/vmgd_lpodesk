@@ -1,3 +1,8 @@
+/**
+ * Author: Igor Michel
+ * Purpose: Provide app shell layout, sidebar navigation, and global footer.
+ * Last updated: 2026-02-28
+ */
 import React, { useState, useEffect, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +18,10 @@ const ROUTE_TITLES = {
 
 function getAppName() {
   return (import.meta.env.VITE_APP_NAME ?? '').trim();
+}
+
+function getCurrentYear() {
+  return new Date().getFullYear();
 }
 
 export default function Layout() {
@@ -46,8 +55,8 @@ export default function Layout() {
   };
 
   return (
-    <div className="app-shell">
-      <header className={`app-header${menuOpen ? ' menu-open' : ''}`}>
+    <div className={`app-shell${menuOpen ? ' menu-open' : ''}`}>
+      <header className="app-header">
         <div className="app-header-inner">
           <div className="header-row">
             <NavLink to="/" className="app-header-brand" end>
@@ -68,7 +77,19 @@ export default function Layout() {
               </span>
             </button>
           </div>
-          <nav className="app-nav">
+        </div>
+      </header>
+
+      <div className="app-layout">
+        <aside className="app-sidebar" aria-label="Main navigation">
+          <NavLink to="/" className="app-sidebar-brand" end>
+            <span className="app-header-logo-wrap">
+              <img src="/vmgd-logo.png" alt="VMGD logo" className="app-header-logo" />
+            </span>
+            <span className="app-sidebar-brand-text">{getAppName()}</span>
+          </NavLink>
+
+          <nav className="app-nav app-nav-sidebar">
             <div className="app-nav-links">
               <NavLink to="/" end className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
                 Dashboard
@@ -99,11 +120,22 @@ export default function Layout() {
               </button>
             </div>
           </nav>
-        </div>
-      </header>
-      <main className="app-main">
-        <Outlet />
-      </main>
+        </aside>
+
+        <main className="app-main">
+          <Outlet />
+          <footer className="app-footer" aria-label="Application footer">
+            <span className="app-footer-text">&copy; VMGD {getCurrentYear()} · For internal use · Author: Igor Michel</span>
+          </footer>
+        </main>
+      </div>
+
+      <button
+        type="button"
+        className="sidebar-backdrop"
+        aria-label="Close navigation menu"
+        onClick={closeMenu}
+      />
     </div>
   );
 }

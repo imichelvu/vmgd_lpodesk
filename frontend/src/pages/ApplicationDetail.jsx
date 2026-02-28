@@ -1,3 +1,8 @@
+/**
+ * Author: Igor Michel
+ * Purpose: Show leave application details, approvers, status, and approval actions.
+ * Last updated: 2026-02-28
+ */
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -5,6 +10,8 @@ import { ROLE_IDS } from '../context/AuthContext';
 import { useApi } from '../hooks/useApi';
 import SignatureField from '../components/SignatureField';
 import Button from '../components/Button';
+import PageHeader from '../components/PageHeader';
+import StatusBadge from '../components/StatusBadge';
 
 const STATUS_LABELS = {
   Pending_PSO: 'Pending Superior',
@@ -13,6 +20,25 @@ const STATUS_LABELS = {
   Approved: 'Approved',
   Disapproved: 'Disapproved',
 };
+
+function toRoleLabelForPsoStage(roleIds) {
+  const ids = Array.isArray(roleIds) ? roleIds.map(Number) : [];
+  if (ids.includes(ROLE_IDS.Manager) && !ids.includes(ROLE_IDS.PSO)) return 'Manager';
+  return 'PSO';
+}
+
+function formatDateTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
 
 export default function ApplicationDetail() {
   const { id } = useParams();
@@ -81,6 +107,13 @@ export default function ApplicationDetail() {
 
   if (!app) return <div>Loading...</div>;
 
+  const psoName = app.approved_by_pso_name || '';
+  const managerName = app.approved_by_manager_name || '';
+  const directorName = app.approved_by_director_name || '';
+  const psoRoleLabel = toRoleLabelForPsoStage(app.approved_by_pso_role_ids);
+  const samePersonForPsoAndManager = psoName && managerName && psoName === managerName;
+  const hasApprovers = !!(psoName || managerName || directorName);
+
   return (
     <>
       <p style={{ margin: '0 0 8px 0' }}>
@@ -88,10 +121,13 @@ export default function ApplicationDetail() {
           ← Back to dashboard
         </button>
       </p>
-      <h2 style={{ marginTop: 0 }}>Application #{app.id}</h2>
+      <PageHeader title={`Application #${app.id}`} />
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <span><strong>Status:</strong> {STATUS_LABELS[app.status] || app.status}</span>
+          <span><strong>Status:</strong> <StatusBadge status={app.status} /></span>
+          {app.status === 'Approved' && Number(user?.id) === Number(app.applicant_id) && (
+            <Button to={`/application/${app.id}/print`} variant="secondary">Printable full form</Button>
+          )}
         </div>
       </div>
 
@@ -124,12 +160,36 @@ export default function ApplicationDetail() {
         </div>
       )}
 
-      {(app.approved_by_pso_name || app.approved_by_manager_name || app.approved_by_director_name) && (
+      {hasApprovers && (
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Approvers</h3>
-          {app.approved_by_pso_name && <p><strong>Approved by (PSO level):</strong> {app.approved_by_pso_name}</p>}
-          {app.approved_by_manager_name && <p><strong>Approved by (Manager):</strong> {app.approved_by_manager_name}</p>}
-          {app.approved_by_director_name && <p><strong>Approved by (Director):</strong> {app.approved_by_director_name}</p>}
+          {samePersonForPsoAndManager ? (
+            <p>
+              <strong>Approved by (Manager):</strong> {managerName}
+              {app.manager_approved_at ? ` (${formatDateTime(app.manager_approved_at)})` : ''}
+            </p>
+          ) : (
+            <>
+              {psoName && (
+                <p>
+                  <strong>Approved at PSO stage ({psoRoleLabel}):</strong> {psoName}
+                  {app.pso_approved_at ? ` (${formatDateTime(app.pso_approved_at)})` : ''}
+                </p>
+              )}
+              {managerName && (
+                <p>
+                  <strong>Approved at Manager stage (Manager):</strong> {managerName}
+                  {app.manager_approved_at ? ` (${formatDateTime(app.manager_approved_at)})` : ''}
+                </p>
+              )}
+            </>
+          )}
+          {directorName && (
+            <p>
+              <strong>Approved by (Director):</strong> {directorName}
+              {app.director_approved_at ? ` (${formatDateTime(app.director_approved_at)})` : ''}
+            </p>
+          )}
         </div>
       )}
 

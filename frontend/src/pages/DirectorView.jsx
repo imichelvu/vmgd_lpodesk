@@ -2,6 +2,7 @@ import React from 'react';
 import { useApi } from '../hooks/useApi';
 import { useRequestList } from '../hooks/useRequestList';
 import Button from '../components/Button';
+import PageHeader from '../components/PageHeader';
 
 export default function DirectorView() {
   const { request } = useApi();
@@ -9,10 +10,10 @@ export default function DirectorView() {
 
   return (
     <>
-      <h2>Director — Final sign-off</h2>
-      <p className="text-muted">
-        All VMGD staff applications across divisions, after manager approval. Perform final sign-off here.
-      </p>
+      <PageHeader
+        title="Director — Final sign-off"
+        subtitle="All VMGD staff applications across divisions, after manager approval. Perform final sign-off here."
+      />
       {list.length === 0 ? (
         <div className="card">
           <p className="text-muted">No applications pending Director sign-off.</p>

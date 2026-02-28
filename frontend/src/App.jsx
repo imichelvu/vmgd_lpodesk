@@ -12,6 +12,7 @@ import SupervisorView from './pages/SupervisorView';
 import DirectorView from './pages/DirectorView';
 import AdminView from './pages/AdminView';
 import ApplicationDetail from './pages/ApplicationDetail';
+import ApplicationPrint from './pages/ApplicationPrint';
 
 function PrivateRoute({ children, allowedRoleIds }) {
   const { user, loading } = useAuth();
@@ -40,6 +41,7 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="apply" element={<NewApplication />} />
         <Route path="application/:id" element={<ApplicationDetail />} />
+        <Route path="application/:id/print" element={<ApplicationPrint />} />
         <Route
           path="supervisor"
           element={

@@ -4,6 +4,7 @@ import SearchableSelect from '../components/SearchableSelect';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import PageHeader from '../components/PageHeader';
 import UsersSectionHeader from '../components/admin/UsersSectionHeader';
 import DivisionFilter from '../components/admin/DivisionFilter';
 import UserBulkActions from '../components/admin/UserBulkActions';
@@ -454,8 +455,10 @@ export default function AdminView() {
 
   return (
     <>
-      <h2 style={{ marginBottom: '0.5rem' }}>Admin</h2>
-      <p className="card-subtitle" style={{ marginTop: 0 }}>Manage users, roles, and acting supervisors.</p>
+      <PageHeader
+        title="Admin"
+        subtitle="Manage users, roles, and acting supervisors."
+      />
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <h3 style={{ marginTop: 0 }}>Pending leave notifications</h3>

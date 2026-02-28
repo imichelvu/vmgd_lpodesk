@@ -1,44 +1,90 @@
-/* =========================
-   App shell, header, layout
-   ========================= */
+/* ==========================================
+   App shell + left sidebar application layout
+   ========================================== */
 
 .app-shell {
-  display: flex;
-  flex-direction: column;
   min-height: 100vh;
+  background: var(--bg);
 }
 
+/* Mobile top bar (desktop hides this) */
 .app-header {
+  display: none;
   position: sticky;
   top: 0;
-  z-index: 50;
+  z-index: 70;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .app-header-inner {
-  max-width: 1200px;
-  margin: 0 auto;
   width: 100%;
-  padding: 0 24px;
-  min-height: 52px;
+  padding: 0 16px;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+}
+
+.header-row {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
 }
 
+.app-layout {
+  min-height: 100vh;
+  display: flex;
+  align-items: stretch;
+}
+
+.app-sidebar {
+  width: 260px;
+  flex: 0 0 260px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(8px);
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 18px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 60;
+  box-shadow: 0 8px 28px rgba(16, 24, 40, 0.06);
+}
+
+.app-sidebar-brand,
 .app-header-brand {
   display: flex;
   align-items: center;
   text-decoration: none;
   color: inherit;
   border-radius: var(--radius-sm);
-  padding: 6px 4px;
-  margin: -6px -4px;
+  padding: 6px 8px;
   transition: background 0.15s, color 0.15s;
+}
+
+.app-sidebar-brand:hover,
+.app-header-brand:hover {
+  color: var(--accent);
+  text-decoration: none;
+  background: rgba(0, 120, 212, 0.08);
+}
+
+.app-sidebar-brand:focus-visible,
+.app-header-brand:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.app-sidebar-brand-text {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .app-header-logo-wrap {
@@ -55,16 +101,6 @@
   border-radius: 50%;
 }
 
-.app-header-brand:hover {
-  color: var(--accent);
-  text-decoration: none;
-}
-
-.app-header-brand:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-focus);
-}
-
 .app-header-brand h1 {
   margin: 0;
   font-size: 18px;
@@ -73,20 +109,30 @@
   letter-spacing: -0.01em;
 }
 
-.header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
 .app-main {
   flex: 1;
-  padding: 24px;
-  max-width: 1200px;
-  margin: 0 auto;
-  width: 100%;
   min-width: 0;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-footer {
+  margin-top: auto;
+  padding-top: 20px;
+  text-align: center;
+}
+
+.app-footer-text {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.8;
+  letter-spacing: 0.02em;
+}
+
+.sidebar-backdrop {
+  display: none;
 }
 
 /* Apply page split view (form + preview) */
@@ -110,7 +156,7 @@
 .apply-page-preview {
   flex: 0 0 auto;
   position: sticky;
-  top: 0;
+  top: 24px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -124,27 +170,23 @@
   justify-content: flex-start;
 }
 
-.apply-page-head h2 {
-  margin: 0 0 4px 0;
+.apply-page-head .page-header {
+  margin-bottom: 0;
+}
+
+.apply-page-head .page-title {
   font-size: 20px;
   font-weight: 600;
   line-height: 1.3;
 }
 
-.apply-page-head p {
-  margin: 0 0 16px 0;
+.apply-page-head .page-subtitle {
+  margin: 0 0 16px;
   font-size: 14px;
 }
 
-.apply-page-preview-head h2 {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--text);
-  line-height: 1.3;
-}
-
-.apply-page-preview-head p {
-  margin: 0 0 16px 0;
+.apply-preview-title .page-subtitle {
+  visibility: hidden;
 }
 
 @media (max-width: 1023px) {
@@ -154,6 +196,62 @@
 
   .apply-page-form {
     max-width: 100%;
+  }
+}
+
+/* Sidebar becomes drawer on tablets/phones */
+@media (max-width: 1024px) {
+  .app-header {
+    display: block;
+  }
+
+  .app-layout {
+    display: block;
+    min-height: auto;
+  }
+
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    width: 280px;
+    flex-basis: 280px;
+    height: auto;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  }
+
+  .app-shell.menu-open .app-sidebar {
+    transform: translateX(0);
+  }
+
+  .app-main {
+    padding: 16px;
+  }
+
+  .app-footer {
+    padding-top: 16px;
+  }
+
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    border: 0;
+    background: rgba(0, 0, 0, 0.25);
+    z-index: 55;
+  }
+
+  .app-shell.menu-open .sidebar-backdrop {
+    display: block;
+  }
+}
+
+@media print {
+  .app-footer {
+    display: none !important;
   }
 }
 
