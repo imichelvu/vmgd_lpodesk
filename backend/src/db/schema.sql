@@ -91,6 +91,70 @@ CREATE TRIGGER delegations_updated_at
   BEFORE UPDATE ON delegations
   FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
 
+-- leave balance policies (defaults per leave type)
+CREATE TABLE IF NOT EXISTS leave_balance_policies (
+  leave_type VARCHAR(100) PRIMARY KEY,
+  default_allocation_days DECIMAL(7,2) NOT NULL DEFAULT 0,
+  requires_balance BOOLEAN NOT NULL DEFAULT true,
+  allow_negative BOOLEAN NOT NULL DEFAULT false,
+  min_notice_days INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TRIGGER leave_balance_policies_updated_at
+  BEFORE UPDATE ON leave_balance_policies
+  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+
+INSERT INTO leave_balance_policies (leave_type, default_allocation_days, requires_balance, allow_negative, min_notice_days) VALUES
+  ('Annual vacation', 0, true, false, 14),
+  ('Home island', 10, true, false, 14),
+  ('Sick leave', 21, true, false, 0),
+  ('Maternity', 90, true, false, 14),
+  ('Family', 5, true, false, 14),
+  ('Compassionate', 5, true, false, 0),
+  ('Sporting / Cultural / Religious', 5, true, false, 14),
+  ('Leave without pay', 0, false, true, 14),
+  ('Other', 0, false, true, 14)
+ON CONFLICT (leave_type) DO NOTHING;
+
+-- monthly accrual tiers (section 29 rules configurable by years of service)
+CREATE TABLE IF NOT EXISTS leave_accrual_tiers (
+  leave_type VARCHAR(100) NOT NULL,
+  min_years INTEGER NOT NULL,
+  monthly_days DECIMAL(6,3) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (leave_type, min_years),
+  CONSTRAINT leave_accrual_tiers_non_negative CHECK (min_years >= 0 AND monthly_days >= 0)
+);
+
+CREATE TRIGGER leave_accrual_tiers_updated_at
+  BEFORE UPDATE ON leave_accrual_tiers
+  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+
+INSERT INTO leave_accrual_tiers (leave_type, min_years, monthly_days) VALUES
+  ('Annual vacation', 0, 1.25),
+  ('Annual vacation', 6, 1.75)
+ON CONFLICT (leave_type, min_years) DO NOTHING;
+
+-- leave balances per user/year/type
+CREATE TABLE IF NOT EXISTS leave_balances (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  leave_type VARCHAR(100) NOT NULL REFERENCES leave_balance_policies(leave_type) ON DELETE RESTRICT,
+  year INTEGER NOT NULL,
+  allocated_days DECIMAL(7,2) NOT NULL DEFAULT 0,
+  carry_forward_days DECIMAL(7,2) NOT NULL DEFAULT 0,
+  used_days DECIMAL(7,2) NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, leave_type, year)
+);
+
+CREATE TRIGGER leave_balances_updated_at
+  BEFORE UPDATE ON leave_balances
+  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+
 -- leave_applications (PSC Form 4-9 fields)
 CREATE TABLE IF NOT EXISTS leave_applications (
   id SERIAL PRIMARY KEY,
@@ -167,3 +231,4 @@ CREATE INDEX IF NOT EXISTS idx_leave_applications_dates ON leave_applications(st
 CREATE INDEX IF NOT EXISTS idx_delegations_dates ON delegations(start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_delegations_delegatee ON delegations(delegatee_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_leave_balances_user_year ON leave_balances(user_id, year);

@@ -6,6 +6,24 @@
 import pool from '../db/pool.js';
 import { LEAVE_STATUS } from '../constants/roles.js';
 import { notifyUser, getNextApprover, getPendingPsoApprovers, notifyApplicant } from '../helpers/notifications.js';
+import {
+  toPositiveNumber,
+  currentYear,
+  getBalanceSnapshot,
+  getBalanceListForUser,
+  assertSufficientBalance,
+  assertAdvanceNotice,
+} from '../services/leaveBalanceService.js';
+
+function getPaginationParams(query = {}, defaults = { page: 1, pageSize: 20, maxPageSize: 100 }) {
+  const pageRaw = Number.parseInt(query.page, 10);
+  const pageSizeRaw = Number.parseInt(query.pageSize, 10);
+  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : defaults.page;
+  const pageSizeUncapped = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? pageSizeRaw : defaults.pageSize;
+  const pageSize = Math.min(pageSizeUncapped, defaults.maxPageSize);
+  const offset = (page - 1) * pageSize;
+  return { page, pageSize, offset };
+}
 
 export async function create(req, res) {
   const userId = req.user.id;
@@ -19,22 +37,40 @@ export async function create(req, res) {
     return res.status(400).json({ error: 'leave_type, start_date, end_date, total_working_days required' });
   }
 
-  const { rows } = await pool.query(
-    `INSERT INTO leave_applications (
-      applicant_id, leave_type, destination, start_date, end_date,
-      is_half_day, half_day_time_start, half_day_time_end, total_working_days,
-      advance_pay, advance_pay_date, reason_or_remarks, status, signature_data
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-    RETURNING *`,
-    [
-      userId, leave_type, destination || null, start_date, end_date,
-      !!is_half_day, half_day_time_start || null, half_day_time_end || null,
-      total_working_days, !!advance_pay, advance_pay_date || null,
-      reason_or_remarks || null, LEAVE_STATUS.Pending_PSO,
-      signature_data ? JSON.stringify(signature_data) : null
-    ]
-  );
-  const application = rows[0];
+  const requestedDays = toPositiveNumber(total_working_days);
+  const year = start_date ? new Date(start_date).getFullYear() : currentYear();
+  const client = await pool.connect();
+  let application;
+  try {
+    await client.query('BEGIN');
+    const balance = await getBalanceSnapshot(client, userId, leave_type, year);
+    if (!balance) throw new Error(`Unsupported leave type: ${leave_type}`);
+    assertAdvanceNotice(balance, start_date, leave_type);
+    assertSufficientBalance(balance, requestedDays, leave_type);
+
+    const { rows } = await client.query(
+      `INSERT INTO leave_applications (
+        applicant_id, leave_type, destination, start_date, end_date,
+        is_half_day, half_day_time_start, half_day_time_end, total_working_days,
+        advance_pay, advance_pay_date, reason_or_remarks, status, signature_data
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      RETURNING *`,
+      [
+        userId, leave_type, destination || null, start_date, end_date,
+        !!is_half_day, half_day_time_start || null, half_day_time_end || null,
+        total_working_days, !!advance_pay, advance_pay_date || null,
+        reason_or_remarks || null, LEAVE_STATUS.Pending_PSO,
+        signature_data ? JSON.stringify(signature_data) : null
+      ]
+    );
+    application = rows[0];
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    return res.status(400).json({ error: err.message || 'Could not submit leave request' });
+  } finally {
+    client.release();
+  }
 
   const approvers = await getPendingPsoApprovers(application.id);
   const title = 'New leave application for approval';
@@ -59,6 +95,17 @@ export async function create(req, res) {
   res.status(201).json(application);
 }
 
+export async function listBalances(req, res) {
+  const year = currentYear();
+  const client = await pool.connect();
+  try {
+    const items = await getBalanceListForUser(client, req.user.id, year);
+    res.json({ year, items });
+  } finally {
+    client.release();
+  }
+}
+
 export async function listMine(req, res) {
   const { rows } = await pool.query(
     `SELECT la.*, d.name as division_name
@@ -72,10 +119,52 @@ export async function listMine(req, res) {
   res.json(rows);
 }
 
+export async function listMineHistory(req, res) {
+  const { page, pageSize, offset } = getPaginationParams(req.query);
+  const userId = req.user.id;
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total
+     FROM leave_applications la
+     WHERE la.applicant_id = $1
+       AND la.status IN ('Approved', 'Disapproved')`,
+    [userId]
+  );
+  const total = countResult.rows[0]?.total || 0;
+
+  const { rows } = await pool.query(
+    `SELECT la.*, d.name as division_name,
+            pso.full_name as approved_by_pso_name,
+            mgr.full_name as approved_by_manager_name,
+            dir.full_name as approved_by_director_name
+     FROM leave_applications la
+     JOIN users u ON u.id = la.applicant_id
+     LEFT JOIN divisions d ON d.id = u.division_id
+     LEFT JOIN users pso ON pso.id = la.approved_by_pso_id
+     LEFT JOIN users mgr ON mgr.id = la.approved_by_manager_id
+     LEFT JOIN users dir ON dir.id = la.approved_by_director_id
+     WHERE la.applicant_id = $1
+       AND la.status IN ('Approved', 'Disapproved')
+     ORDER BY COALESCE(la.director_approved_at, la.updated_at) DESC, la.id DESC
+     LIMIT $2 OFFSET $3`,
+    [userId, pageSize, offset]
+  );
+
+  res.json({
+    items: rows,
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  });
+}
+
 export async function listForSupervisor(req, res) {
   const user = req.user;
   const divisionId = user.division_id;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10); // used for delegation checks
+  const { page, pageSize, offset } = getPaginationParams(req.query);
+  const filterDivisionId = req.query.division_id != null ? Number(req.query.division_id) : null;
 
   const { rows: acting } = await pool.query(
     `SELECT delegator_id FROM delegations
@@ -87,32 +176,222 @@ export async function listForSupervisor(req, res) {
   const roleIds = (user.role_ids || []).map((r) => Number(r));
   const isManager = roleIds.includes(3);
 
-  const { rows } = await pool.query(
-    `SELECT la.*, u.full_name as applicant_name, u.email as applicant_email, d.name as division_name
-     FROM leave_applications la
-     JOIN users u ON u.id = la.applicant_id
-     LEFT JOIN divisions d ON d.id = u.division_id
-     WHERE la.status IN ('Pending_PSO', 'Pending_Manager')
-       AND (
-         (la.status = 'Pending_PSO' AND (u.reports_to_id = ANY($1::int[]) OR ($2::boolean AND u.division_id = $3)))
-         OR (la.status = 'Pending_Manager' AND u.division_id = $3)
-       )
-     ORDER BY la.created_at ASC`,
-    [canActAsIds, isManager, divisionId]
-  );
-  res.json(rows);
+  // Parameters for the count query
+  const countConditions = [`la.status IN ('Pending_PSO', 'Pending_Manager')`];
+  const countParams = [];
+  let countParamIndex = 1;
+
+  // Add role/delegation conditions for count
+  // This part of the WHERE clause does NOT depend on division filter, so it should be handled separately for parameter indexing
+  // For the count query, we only care about the first 3 params related to roles/delegations if no division filter is present.
+  // If division filter is present, we push it to countParams
+  
+  // NOTE: The main query below already handles the complex role/delegation conditions.
+  // For the count query, we only need to accurately reflect the division filter and status.
+  // The existing listForSupervisor logic for the specific roles is intricate and relies on multiple base parameters ($1, $2, $3).
+  // To avoid re-complicating the count query and ensure correct parameter binding, I'll simplify the count conditions.
+  // However, the original structure of listForSupervisor is a bit complex in how it combines conditions.
+  // The error "bind message supplies 3 parameters, but prepared statement "" requires 0" specifically points to the countQuery.
+  // This means the `params.slice(...)` logic was incorrect.
+
+  // Let's rebuild the conditions and params for the count query from scratch to be safe.
+  const baseCountConditions = [`la.status IN ('Pending_PSO', 'Pending_Manager')`];
+  const baseCountParams = [];
+
+  // Add the specific role/delegation conditions for the count query
+  // This is a direct translation of the main query's role logic but only for the count part
+  baseCountConditions.push(`(
+    (la.status = 'Pending_PSO' AND (u.reports_to_id = ANY($${countParamIndex++}::int[]) OR ($${countParamIndex++}::boolean AND u.division_id = $${countParamIndex++})))
+    OR (la.status = 'Pending_Manager' AND u.division_id = $${countParamIndex++})
+  )`);
+  baseCountParams.push(canActAsIds, isManager, divisionId, divisionId); // Duplicate divisionId for Manager check
+
+  // Add division filter if specified and valid
+  if (Number.isFinite(filterDivisionId) && filterDivisionId > 0) {
+    baseCountConditions.push(`u.division_id = $${countParamIndex++}`);
+    baseCountParams.push(filterDivisionId);
+  }
+  const countWhereClause = `WHERE ${baseCountConditions.join(' AND ')}`;
+  const countQuery = `SELECT COUNT(*)::int AS total FROM leave_applications la JOIN users u ON u.id = la.applicant_id ${countWhereClause}`;
+  const { rows: countRows } = await pool.query(countQuery, baseCountParams);
+  const total = countRows[0]?.total || 0;
+
+  // Parameters for the main query
+  const mainConditions = [`la.status IN ('Pending_PSO', 'Pending_Manager')`];
+  const mainParams = [];
+  let mainParamIndex = 1;
+
+  mainConditions.push(`(
+    (la.status = 'Pending_PSO' AND (u.reports_to_id = ANY($${mainParamIndex++}::int[]) OR ($${mainParamIndex++}::boolean AND u.division_id = $${mainParamIndex++})))
+    OR (la.status = 'Pending_Manager' AND u.division_id = $${mainParamIndex++})
+  )`);
+  mainParams.push(canActAsIds, isManager, divisionId, divisionId); // Duplicate divisionId for Manager check
+
+  if (Number.isFinite(filterDivisionId) && filterDivisionId > 0) {
+    mainConditions.push(`u.division_id = $${mainParamIndex++}`);
+    mainParams.push(filterDivisionId);
+  }
+  const mainWhereClause = `WHERE ${mainConditions.join(' AND ')}`;
+
+  const mainQuery = `
+    SELECT la.*, u.full_name as applicant_name, u.email as applicant_email, d.name as division_name
+    FROM leave_applications la
+    JOIN users u ON u.id = la.applicant_id
+    LEFT JOIN divisions d ON d.id = u.division_id
+    ${mainWhereClause}
+    ORDER BY la.created_at ASC
+    LIMIT $${mainParamIndex++} OFFSET $${mainParamIndex++}`;
+  mainParams.push(pageSize, offset);
+
+  const { rows } = await pool.query(mainQuery, mainParams);
+
+  res.json({
+    items: rows,
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  });
 }
 
 export async function listForDirector(req, res) {
+  const { page, pageSize, offset } = getPaginationParams(req.query);
+  const filterDivisionId = req.query.division_id != null ? Number(req.query.division_id) : null;
+  
+  const countParams = [];
+  let countParamIndex = 1;
+  const countConditions = [`la.status = 'Pending_Director'`];
+  if (Number.isFinite(filterDivisionId) && filterDivisionId > 0) {
+    countConditions.push(`u.division_id = $${countParamIndex++}`);
+    countParams.push(filterDivisionId);
+  }
+  const countWhereClause = `WHERE ${countConditions.join(' AND ')}`;
+  const countQuery = `SELECT COUNT(*)::int AS total FROM leave_applications la JOIN users u ON u.id = la.applicant_id ${countWhereClause}`;
+  const { rows: countRows } = await pool.query(countQuery, countParams);
+  const total = countRows[0]?.total || 0;
+
+  const mainParams = [];
+  let mainParamIndex = 1;
+  const mainConditions = [`la.status = 'Pending_Director'`];
+  if (Number.isFinite(filterDivisionId) && filterDivisionId > 0) {
+    mainConditions.push(`u.division_id = $${mainParamIndex++}`);
+    mainParams.push(filterDivisionId);
+  }
+  const mainWhereClause = `WHERE ${mainConditions.join(' AND ')}`;
+
+  const mainQuery = `
+    SELECT la.*, u.full_name as applicant_name, d.name as division_name
+    FROM leave_applications la
+    JOIN users u ON u.id = la.applicant_id
+    LEFT JOIN divisions d ON d.id = u.division_id
+    ${mainWhereClause}
+    ORDER BY la.created_at ASC
+    LIMIT $${mainParamIndex++} OFFSET $${mainParamIndex++}`;
+  mainParams.push(pageSize, offset);
+
+  const { rows } = await pool.query(mainQuery, mainParams);
+
+  res.json({
+    items: rows,
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  });
+}
+
+export async function listSupervisorHistory(req, res) {
+  const user = req.user;
+  const today = new Date().toISOString().slice(0, 10);
+  const { page, pageSize, offset } = getPaginationParams(req.query);
+
+  const { rows: acting } = await pool.query(
+    `SELECT delegator_id FROM delegations
+     WHERE delegatee_id = $1 AND is_active = true AND $2::date BETWEEN start_date AND end_date`,
+    [user.id, today]
+  );
+  const actingForIds = acting.map((a) => a.delegator_id);
+  const canActAsIds = [user.id, ...actingForIds];
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total
+     FROM leave_applications la
+     WHERE la.approved_by_pso_id = ANY($1::int[])
+        OR la.approved_by_manager_id = $2`,
+    [canActAsIds, user.id]
+  );
+  const total = countResult.rows[0]?.total || 0;
+
   const { rows } = await pool.query(
-    `SELECT la.*, u.full_name as applicant_name, d.name as division_name
+    `SELECT
+      la.*,
+      u.full_name as applicant_name,
+      u.email as applicant_email,
+      d.name as division_name,
+      CASE
+        WHEN la.approved_by_manager_id = $2 THEN 'Manager'
+        WHEN la.approved_by_pso_id = ANY($1::int[]) THEN 'PSO'
+        ELSE 'Unknown'
+      END as acted_as,
+      CASE
+        WHEN la.approved_by_manager_id = $2 THEN COALESCE(la.manager_approved_at, la.updated_at)
+        WHEN la.approved_by_pso_id = ANY($1::int[]) THEN COALESCE(la.pso_approved_at, la.updated_at)
+        ELSE la.updated_at
+      END as acted_at
      FROM leave_applications la
      JOIN users u ON u.id = la.applicant_id
      LEFT JOIN divisions d ON d.id = u.division_id
-     WHERE la.status = 'Pending_Director'
-     ORDER BY la.created_at ASC`
+     WHERE la.approved_by_pso_id = ANY($1::int[])
+        OR la.approved_by_manager_id = $2
+     ORDER BY acted_at DESC, la.id DESC
+     LIMIT $3 OFFSET $4`,
+    [canActAsIds, user.id, pageSize, offset]
   );
-  res.json(rows);
+
+  res.json({
+    items: rows,
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  });
+}
+
+export async function listDirectorHistory(req, res) {
+  const { page, pageSize, offset } = getPaginationParams(req.query);
+  const userId = req.user.id;
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total
+     FROM leave_applications la
+     WHERE la.approved_by_director_id = $1`,
+    [userId]
+  );
+  const total = countResult.rows[0]?.total || 0;
+
+  const { rows } = await pool.query(
+    `SELECT
+      la.*,
+      u.full_name as applicant_name,
+      u.email as applicant_email,
+      d.name as division_name,
+      COALESCE(la.director_approved_at, la.updated_at) as acted_at
+     FROM leave_applications la
+     JOIN users u ON u.id = la.applicant_id
+     LEFT JOIN divisions d ON d.id = u.division_id
+     WHERE la.approved_by_director_id = $1
+     ORDER BY acted_at DESC, la.id DESC
+     LIMIT $2 OFFSET $3`,
+    [userId, pageSize, offset]
+  );
+
+  res.json({
+    items: rows,
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  });
 }
 
 export async function getById(req, res) {
@@ -261,16 +540,43 @@ export async function approveOrDisapprove(req, res) {
       );
       return res.json({ message: 'Disapproved', status: LEAVE_STATUS.Disapproved });
     }
-    await pool.query(
-      `UPDATE leave_applications
-       SET status = $1,
-           approved_by_director_id = $2,
-           director_signature_data = $3,
-           director_approved_at = CURRENT_TIMESTAMP,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4`,
-      [LEAVE_STATUS.Approved, user.id, signatureValue, id]
-    );
+    const requestedDays = toPositiveNumber(app.total_working_days);
+    const balanceYear = app.start_date ? new Date(app.start_date).getFullYear() : currentYear();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const balance = await getBalanceSnapshot(client, app.applicant_id, app.leave_type, balanceYear, { lock: true });
+      assertSufficientBalance(balance, requestedDays, app.leave_type);
+
+      await client.query(
+        `UPDATE leave_applications
+         SET status = $1,
+             approved_by_director_id = $2,
+             director_signature_data = $3,
+             director_approved_at = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $4`,
+        [LEAVE_STATUS.Approved, user.id, signatureValue, id]
+      );
+
+      if (balance?.requires_balance && !balance?.allow_negative) {
+        await client.query(
+          `UPDATE leave_balances
+           SET used_days = used_days + $1,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE user_id = $2 AND leave_type = $3 AND year = $4`,
+          [requestedDays, app.applicant_id, app.leave_type, balanceYear]
+        );
+      }
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: err.message || 'Could not finalize approval' });
+    } finally {
+      client.release();
+    }
+
     await notifyApplicant(
       parseInt(id, 10),
       'Leave application approved',

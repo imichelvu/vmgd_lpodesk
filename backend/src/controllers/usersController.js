@@ -164,11 +164,22 @@ export async function list(req, res) {
   const page = Math.max(1, parseInt(req.query.page, 10) || 0);
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
   const divisionId = req.query.division_id != null ? parseInt(req.query.division_id, 10) : null;
+  const searchRaw = req.query.q != null ? String(req.query.q).trim() : '';
   const filterByDivision = Number.isFinite(divisionId) && divisionId > 0;
+  const filterBySearch = searchRaw.length > 0;
   const paginate = page > 0;
 
-  const whereClause = filterByDivision ? ' WHERE u.division_id = $1' : '';
-  const baseParams = filterByDivision ? [divisionId] : [];
+  const conditions = [];
+  const baseParams = [];
+  if (filterByDivision) {
+    baseParams.push(divisionId);
+    conditions.push(`u.division_id = $${baseParams.length}`);
+  }
+  if (filterBySearch) {
+    baseParams.push(`%${searchRaw}%`);
+    conditions.push(`(u.full_name ILIKE $${baseParams.length} OR u.username ILIKE $${baseParams.length} OR u.email ILIKE $${baseParams.length})`);
+  }
+  const whereClause = conditions.length ? ` WHERE ${conditions.join(' AND ')}` : '';
   const baseSql = `
     SELECT u.id, u.full_name, u.username, u.email, u.vnpf_no, u.post_title, u.post_no, u.grade, u.department, u.ministry, u.entry_date, u.division_id, u.reports_to_id,
            d.name as division_name,
@@ -188,9 +199,12 @@ export async function list(req, res) {
       `${baseSql} LIMIT $${limitParam} OFFSET $${offsetParam}`,
       [...baseParams, limit, offset]
     );
-    const countQuery = filterByDivision
-      ? pool.query('SELECT COUNT(*)::int AS total FROM users WHERE division_id = $1', [divisionId])
-      : pool.query('SELECT COUNT(*)::int AS total FROM users');
+    const countQuery = pool.query(
+      `SELECT COUNT(*)::int AS total
+       FROM users u
+       ${whereClause}`,
+      baseParams
+    );
     const [{ rows }, { rows: countRows }] = await Promise.all([mainQuery, countQuery]);
     const total = (countRows && countRows[0] && countRows[0].total) || 0;
     res.json({

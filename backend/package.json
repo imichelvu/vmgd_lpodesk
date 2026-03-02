@@ -8,6 +8,7 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "db:migrate": "node src/db/migrate.js",
+    "db:migrate:leave-balances": "node src/db/migrate-leave-balances.js",
     "db:seed": "node src/db/seed.js",
     "db:add-username": "node src/db/migrate-username.js",
     "test:smtp": "node src/scripts/testSmtp.js"
