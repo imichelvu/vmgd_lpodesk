@@ -40,7 +40,8 @@
 }
 
 .nav-link {
-  display: block;
+  display: flex;
+  align-items: center;
   width: 100%;
   padding: 10px 12px;
   border-radius: 10px;
@@ -51,6 +52,13 @@
   transition: background 0.18s, color 0.18s, border-color 0.18s, transform 0.12s, box-shadow 0.18s;
   text-decoration: none;
   position: relative;
+}
+
+.nav-icon {
+  margin-right: 10px;
+  font-size: 16px; /* Adjust as needed */
+  line-height: 1;
+  color: white;
 }
 
 .nav-link:focus-visible {

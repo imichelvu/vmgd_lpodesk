@@ -11,6 +11,8 @@ import {
   testSmtp,
   syncFromAd,
   importAdUsers,
+  getUserBalances,
+  updateUserBalance,
 } from '../controllers/usersController.js';
 import { authRequired } from '../middleware/auth.js';
 import { checkRole, ROLE_IDS } from '../middleware/checkRole.js';
@@ -31,5 +33,8 @@ router.get('/:id', getById);
 router.post('/', create);
 router.patch('/:id', update);
 router.delete('/:id', remove);
+
+router.get('/:id/balances', getUserBalances);
+router.patch('/:id/balances/:balanceId', updateUserBalance);
 
 export default router;

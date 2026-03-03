@@ -567,3 +567,86 @@ export async function testSmtp(req, res) {
     res.status(500).json({ error: 'Send failed: ' + (err.message || String(err)) });
   }
 }
+
+export async function getUserBalances(req, res) {
+  const { id: userId } = req.params;
+  const year = parseInt(req.query.year || new Date().getFullYear(), 10);
+
+  if (isNaN(userId)) {
+    return res.status(400).json({ error: 'Invalid user ID.' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT
+        lb.id,
+        lb.leave_type,
+        lb.year,
+        lb.allocated_days,
+        lb.used_days,
+        lb.carried_over_days,
+        lbp.max_carry_over_days,
+        lbp.is_unlimited
+      FROM leave_balances lb
+      JOIN leave_balance_policies lbp ON lb.leave_type = lbp.leave_type
+      WHERE lb.user_id = $1 AND lb.year = $2
+      ORDER BY lb.leave_type`,
+      [userId, year]
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error(`Error fetching balances for user ${userId}, year ${year}:`, error);
+    res.status(500).json({ error: 'Failed to fetch user leave balances.' });
+  }
+}
+
+export async function updateUserBalance(req, res) {
+  const { id: userId, balanceId } = req.params;
+  const { allocated_days, carried_over_days } = req.body;
+
+  if (isNaN(userId) || isNaN(balanceId)) {
+    return res.status(400).json({ error: 'Invalid user ID or balance ID.' });
+  }
+
+  if ((allocated_days === undefined && carried_over_days === undefined) || (allocated_days !== undefined && isNaN(allocated_days)) || (carried_over_days !== undefined && isNaN(carried_over_days))) {
+    return res.status(400).json({ error: 'Valid allocated_days or carried_over_days are required.' });
+  }
+
+  const updates = [];
+  const values = [];
+  let paramIndex = 1;
+
+  if (allocated_days !== undefined) {
+    updates.push(`allocated_days = $${paramIndex++}`);
+    values.push(allocated_days);
+  }
+  if (carried_over_days !== undefined) {
+    updates.push(`carried_over_days = $${paramIndex++}`);
+    values.push(carried_over_days);
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'No update parameters provided.' });
+  }
+
+  values.push(balanceId); // balanceId is the WHERE condition
+
+  try {
+    const { rowCount, rows } = await pool.query(
+      `UPDATE leave_balances
+       SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $${paramIndex}
+       RETURNING *`,
+      values
+    );
+
+    if (rowCount === 0) {
+      return res.status(404).json({ error: 'Leave balance not found or no changes made.' });
+    }
+
+    res.json(rows[0]);
+  } catch (error) {
+    console.error(`Error updating balance ${balanceId} for user ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to update user leave balance.' });
+  }
+}

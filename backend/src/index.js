@@ -6,6 +6,8 @@ import authRoutes from './routes/auth.js';
 import leaveRoutes from './routes/leave.js';
 import usersRoutes from './routes/users.js';
 import delegationsRoutes from './routes/delegations.js';
+import overtimeRoutes from './routes/overtime.js';
+import leavePolicyRoutes from './routes/leavePolicyRoutes.js'; // Import new routes
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -25,8 +27,10 @@ app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/leave', leaveRoutes);
+app.use('/api/overtime', overtimeRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/delegations', delegationsRoutes);
+app.use('/api/admin/leave-policies', leavePolicyRoutes); // Mount new routes
 
 app.get('/', (_, res) => {
   res.type('html').send(`
@@ -37,7 +41,7 @@ app.get('/', (_, res) => {
         <h1>VMGD Leave API</h1>
         <p>Backend is running. Use the frontend app to sign in.</p>
         <ul>
-          <li><a href="/api/health">Health check</a> (JSON)</li>
+    <li><a href="/api/health">Health check</a> (JSON)</li>
           <li><a href="/api/troubleshoot">Troubleshoot</a> (JSON)</li>
           <li><a href="http://localhost:5173">Open frontend (localhost:5173)</a></li>
         </ul>

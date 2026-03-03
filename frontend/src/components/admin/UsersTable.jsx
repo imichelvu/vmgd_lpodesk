@@ -1,5 +1,6 @@
 import React from 'react';
 import Button from '../Button';
+import AppLoader from '../AppLoader';
 
 export default function UsersTable({
   users,
@@ -39,8 +40,8 @@ export default function UsersTable({
         <tbody>
           {usersLoading ? (
             <tr>
-              <td colSpan={7} style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)' }}>
-                Loading users…
+              <td colSpan={7} style={{ padding: '1.25rem' }}>
+                <AppLoader message="Loading users..." fullPage={false} />
               </td>
             </tr>
           ) : users.length === 0 ? (

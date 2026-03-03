@@ -8,15 +8,18 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import NewApplication from './pages/NewApplication';
+import Overtime from './pages/Overtime';
+import Faq from './pages/Faq';
 import SupervisorView from './pages/SupervisorView';
 import DirectorView from './pages/DirectorView';
 import AdminView from './pages/AdminView';
 import ApplicationDetail from './pages/ApplicationDetail';
 import ApplicationPrint from './pages/ApplicationPrint';
+import AppLoader from './components/AppLoader';
 
 function PrivateRoute({ children, allowedRoleIds }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="app-main">Loading...</div>;
+  if (loading) return <AppLoader message="Loading VMGD LeaveDesk..." />;
   if (!user) return <Navigate to="/login" replace />;
   if (allowedRoleIds && !allowedRoleIds.some((rid) => (user.role_ids || []).includes(rid))) {
     return <Navigate to="/" replace />;
@@ -40,6 +43,8 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="apply" element={<NewApplication />} />
+        <Route path="overtime" element={<Overtime />} />
+        <Route path="faq" element={<Faq />} />
         <Route path="application/:id" element={<ApplicationDetail />} />
         <Route path="application/:id/print" element={<ApplicationPrint />} />
         <Route

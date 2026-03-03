@@ -165,6 +165,9 @@ export default function PSCForm49({
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
+          {leave_type === 'Annual vacation' ? (
+            <span className="form-hint">Annual leave requests must be submitted at least 14 days before start date.</span>
+          ) : null}
         </div>
         <div className="form-group">
           <label htmlFor="destination">Destination</label>

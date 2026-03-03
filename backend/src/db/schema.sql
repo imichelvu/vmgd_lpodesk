@@ -155,6 +155,30 @@ CREATE TRIGGER leave_balances_updated_at
   BEFORE UPDATE ON leave_balances
   FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
 
+-- overtime entries (staff extra hours for payment or TOIL)
+CREATE TABLE IF NOT EXISTS overtime_entries (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  start_datetime TIMESTAMPTZ,
+  end_datetime TIMESTAMPTZ,
+  work_date DATE NOT NULL,
+  hours DECIMAL(5,2) NOT NULL CHECK (hours > 0 AND hours <= 24),
+  purpose VARCHAR(30) NOT NULL
+    CHECK (purpose IN ('Overtime Payment', 'Time Off In Lieu')),
+  remarks TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT overtime_entries_valid_range CHECK (
+    start_datetime IS NULL
+    OR end_datetime IS NULL
+    OR end_datetime > start_datetime
+  )
+);
+
+CREATE TRIGGER overtime_entries_updated_at
+  BEFORE UPDATE ON overtime_entries
+  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+
 -- leave_applications (PSC Form 4-9 fields)
 CREATE TABLE IF NOT EXISTS leave_applications (
   id SERIAL PRIMARY KEY,
@@ -232,3 +256,4 @@ CREATE INDEX IF NOT EXISTS idx_delegations_dates ON delegations(start_date, end_
 CREATE INDEX IF NOT EXISTS idx_delegations_delegatee ON delegations(delegatee_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_leave_balances_user_year ON leave_balances(user_id, year);
+CREATE INDEX IF NOT EXISTS idx_overtime_entries_user_date ON overtime_entries(user_id, work_date DESC);

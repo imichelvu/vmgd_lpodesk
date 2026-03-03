@@ -1,16 +1,19 @@
 /**
  * Author: Igor Michel
  * Purpose: Provide app shell layout, sidebar navigation, and global footer.
- * Last updated: 2026-02-28
+ * Last updated: 2026-02-09
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ROLE_IDS } from '../context/AuthContext';
+import TopBanner from './TopBanner';
 
 const ROUTE_TITLES = {
   '/': 'Dashboard',
   '/apply': 'New application',
+  '/overtime': 'Overtime & TOIL',
+  '/faq': 'FAQ',
   '/supervisor': 'Approvals',
   '/director': 'Director',
   '/admin': 'Admin',
@@ -56,6 +59,7 @@ export default function Layout() {
 
   return (
     <div className={`app-shell${menuOpen ? ' menu-open' : ''}`}>
+      <TopBanner title={getAppName()} />
       <header className="app-header">
         <div className="app-header-inner">
           <div className="header-row">
@@ -92,24 +96,30 @@ export default function Layout() {
           <nav className="app-nav app-nav-sidebar">
             <div className="app-nav-links">
               <NavLink to="/" end className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-                Dashboard
+                <span className="nav-icon">🏠</span> Dashboard
               </NavLink>
               <NavLink to="/apply" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-                New application
+                <span className="nav-icon">📝</span> New application
+              </NavLink>
+              <NavLink to="/overtime" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+                <span className="nav-icon">⏱️</span> Overtime & TOIL
+              </NavLink>
+              <NavLink to="/faq" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+                <span className="nav-icon">❓</span> FAQ
               </NavLink>
               {hasRole([ROLE_IDS.PSO, ROLE_IDS.Manager]) && (
                 <NavLink to="/supervisor" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-                  Approvals
+                  <span className="nav-icon">✔️</span> Approvals
                 </NavLink>
               )}
               {hasRole(ROLE_IDS.Director) && (
                 <NavLink to="/director" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-                  Director
+                  <span className="nav-icon">👑</span> Director
                 </NavLink>
               )}
               {hasRole(ROLE_IDS.Admin) && (
                 <NavLink to="/admin" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-                  Admin
+                  <span className="nav-icon">⚙️</span> Admin
                 </NavLink>
               )}
             </div>
@@ -125,7 +135,16 @@ export default function Layout() {
         <main className="app-main">
           <Outlet />
           <footer className="app-footer" aria-label="Application footer">
-            <span className="app-footer-text">&copy; VMGD {getCurrentYear()} · For internal use · Author: Igor Michel</span>
+            <div className="app-footer-banner">
+              <div className="app-footer-accent app-footer-accent-top" aria-hidden="true" />
+              <div className="app-footer-main-bar">
+                <span className="app-footer-main-title">&copy; VMGD {getCurrentYear()}</span>
+              </div>
+              <div className="app-footer-sub-bar">
+                <span className="app-footer-sub-title">For internal use</span>
+              </div>
+              <div className="app-footer-accent app-footer-accent-bottom" aria-hidden="true" />
+            </div>
           </footer>
         </main>
       </div>

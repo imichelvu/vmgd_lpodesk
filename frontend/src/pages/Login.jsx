@@ -3,12 +3,14 @@ import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/Button';
 import AuthCardLayout from '../components/AuthCardLayout';
+import AppLoader from '../components/AppLoader';
 
 function getAppName() {
   return (import.meta.env.VITE_APP_NAME ?? '').trim();
 }
 
 export default function Login() {
+  const [showSplash, setShowSplash] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -24,7 +26,13 @@ export default function Login() {
     if (name && typeof document !== 'undefined') document.title = name;
   }, []);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), 900);
+    return () => clearTimeout(timer);
+  }, []);
+
   if (user) return <Navigate to="/" replace />;
+  if (showSplash) return <AppLoader message="Preparing sign in..." />;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -105,15 +113,7 @@ export default function Login() {
         </form>
 
         <div className="login-troubleshoot">
-          <Button
-            type="button"
-            variant="secondary"
-            fullWidth
-            style={{ marginBottom: troubleshootOpen ? 12 : 0 }}
-            onClick={() => { setTroubleshootOpen((o) => !o); if (!troubleshootOpen) setTroubleshootResult(null); }}
-          >
-            {troubleshootOpen ? 'Hide troubleshoot' : 'Troubleshoot'}
-          </Button>
+     
           {troubleshootOpen && (
             <div className="troubleshoot-content">
               <p className="card-subtitle" style={{ marginBottom: 8 }}>

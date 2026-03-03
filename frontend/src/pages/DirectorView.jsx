@@ -1,12 +1,14 @@
-import React from 'react';
-import { useApi } from '../hooks/useApi';
-import { useRequestList } from '../hooks/useRequestList';
-import Button from '../components/Button';
+/**
+ * Author: Igor Michel
+ * Purpose: Show director final sign-off queue with inline accordion actions.
+ * Last updated: 2026-02-09
+ */
+import React, { useState } from 'react';
 import PageHeader from '../components/PageHeader';
+import ApproverApplicationList from '../components/ApproverApplicationList';
 
 export default function DirectorView() {
-  const { request } = useApi();
-  const { list } = useRequestList(request, '/leave/director', []);
+  const [activeTab, setActiveTab] = useState('pending');
 
   return (
     <>
@@ -14,43 +16,29 @@ export default function DirectorView() {
         title="Director — Final sign-off"
         subtitle="All VMGD staff applications across divisions, after manager approval. Perform final sign-off here."
       />
-      {list.length === 0 ? (
-        <div className="card">
-          <p className="text-muted">No applications pending Director sign-off.</p>
-        </div>
-      ) : (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Applicant</th>
-                <th>Division</th>
-                <th>Type</th>
-                <th>Start</th>
-                <th>Days</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((app) => (
-                <tr key={app.id}>
-                  <td>{app.id}</td>
-                  <td>{app.applicant_name}</td>
-                  <td>{app.division_name || '—'}</td>
-                  <td>{app.leave_type}</td>
-                  <td>{app.start_date}</td>
-                  <td>{app.total_working_days}</td>
-                  <td>
-                    <Button to={`/application/${app.id}`} variant="primary" size="sm">
-                      Sign off
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="tabs" role="tablist" aria-label="Director approvals view mode">
+        <button type="button" className={`tab${activeTab === 'pending' ? ' active' : ''}`} onClick={() => setActiveTab('pending')}>
+          Pending
+        </button>
+        <button type="button" className={`tab${activeTab === 'history' ? ' active' : ''}`} onClick={() => setActiveTab('history')}>
+          History
+        </button>
+      </div>
+
+      {activeTab === 'pending' && (
+        <ApproverApplicationList
+          endpoint="/leave/director"
+          pageTitle="Pending Director Sign-off"
+          emptyMessage="No applications pending Director sign-off."
+        />
+      )}
+
+      {activeTab === 'history' && (
+        <ApproverApplicationList
+          endpoint="/leave/director/history"
+          pageTitle="Director Sign-off History"
+          emptyMessage="No historical sign-off records yet."
+        />
       )}
     </>
   );

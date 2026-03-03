@@ -12,6 +12,7 @@ import SignatureField from '../components/SignatureField';
 import Button from '../components/Button';
 import PageHeader from '../components/PageHeader';
 import StatusBadge from '../components/StatusBadge';
+import { formatLeaveEnd, formatLeaveStart } from '../utils/leaveDateDisplay';
 
 const STATUS_LABELS = {
   Pending_PSO: 'Pending Superior',
@@ -144,8 +145,8 @@ export default function ApplicationDetail() {
         <h3 style={{ marginTop: 0 }}>Leave details</h3>
         <p><strong>Type:</strong> {app.leave_type}</p>
         {app.destination && <p><strong>Destination:</strong> {app.destination}</p>}
-        <p><strong>Start:</strong> {app.start_date} {app.is_half_day && `(${app.half_day_time_start} - ${app.half_day_time_end})`}</p>
-        <p><strong>End:</strong> {app.end_date}</p>
+        <p><strong>Start:</strong> {formatLeaveStart(app)}</p>
+        <p><strong>End:</strong> {formatLeaveEnd(app)}</p>
         <p><strong>Working days:</strong> {app.total_working_days}</p>
         <p><strong>Advance pay:</strong> {app.advance_pay ? 'Yes' : 'No'}</p>
         {app.reason_or_remarks && <p><strong>Remarks:</strong> {app.reason_or_remarks}</p>}

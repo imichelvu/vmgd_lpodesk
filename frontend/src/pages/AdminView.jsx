@@ -1,15 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useApi } from '../hooks/useApi';
-import SearchableSelect from '../components/SearchableSelect';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import PageHeader from '../components/PageHeader';
 import UsersSectionHeader from '../components/admin/UsersSectionHeader';
 import DivisionFilter from '../components/admin/DivisionFilter';
+import UsersSearchFilter from '../components/admin/UsersSearchFilter';
 import UserBulkActions from '../components/admin/UserBulkActions';
 import UsersTable from '../components/admin/UsersTable';
 import UsersPagination from '../components/admin/UsersPagination';
+import UserFormModal from '../components/admin/UserFormModal';
+import DelegationManagement from '../components/admin/DelegationManagement';
+import UserBalanceManagement from '../components/admin/UserBalanceManagement';
+import LeavePolicyManagement from '../components/admin/LeavePolicyManagement'; // Import new component
 
 const emptyUserForm = (defaultRoleId) => ({
   full_name: '',
@@ -28,17 +32,21 @@ const emptyUserForm = (defaultRoleId) => ({
   role_ids: defaultRoleId != null ? [defaultRoleId] : [],
 });
 
+const parseRoleIds = (roleIds) => {
+  if (Array.isArray(roleIds)) return roleIds.map(Number).filter((n) => !Number.isNaN(n));
+  if (typeof roleIds === 'string') return roleIds.replace(/^\{|\}$/g, '').split(',').map((n) => parseInt(n.trim(), 10)).filter((n) => !Number.isNaN(n));
+  return [];
+};
+
 export default function AdminView() {
   const { request } = useApi();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [divisions, setDivisions] = useState([]);
-  const [delegations, setDelegations] = useState([]);
   const [tab, setTab] = useState('users');
   const [userForm, setUserForm] = useState(null);
   /** Single: { type: 'single', id, full_name }. Bulk: { type: 'bulk', count }. Same modal for both. */
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [delegForm, setDelegForm] = useState({ delegator_id: '', delegatee_id: '', start_date: '', end_date: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resendResult, setResendResult] = useState(null);
@@ -59,13 +67,17 @@ export default function AdminView() {
   const [allUsersForSelect, setAllUsersForSelect] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [divisionFilter, setDivisionFilter] = useState('');
+  const [usersSearch, setUsersSearch] = useState('');
   const [selectedUserIds, setSelectedUserIds] = useState(new Set());
+  const [selectedUserForBalances, setSelectedUserForBalances] = useState(null);
 
-  const loadUsers = (page = usersPage, divisionIdOverride = undefined) => {
+  const loadUsers = useCallback((page = usersPage, divisionIdOverride = undefined, searchOverride = undefined) => {
     setUsersLoading(true);
     const params = new URLSearchParams({ page: String(page), limit: String(usersLimit) });
     const division = divisionIdOverride !== undefined ? divisionIdOverride : divisionFilter;
+    const search = searchOverride !== undefined ? searchOverride : usersSearch;
     if (division) params.set('division_id', division);
+    if (search && String(search).trim()) params.set('q', String(search).trim());
     return request(`/users?${params.toString()}`)
       .then((data) => {
         setUsers(data.users || []);
@@ -74,23 +86,23 @@ export default function AdminView() {
       })
       .catch(() => {})
       .finally(() => setUsersLoading(false));
-  };
-  const loadAllUsersForSelect = () => {
+  }, [request, usersPage, usersLimit, divisionFilter, usersSearch]);
+
+  const loadAllUsersForSelect = useCallback(() => {
     return request('/users?limit=5000')
       .then((data) => {
         const list = Array.isArray(data) ? data : (data?.users ?? []);
         setAllUsersForSelect(list);
       })
       .catch(() => {});
-  };
-  const loadRoles = () => request('/users/roles').then(setRoles).catch(() => {});
-  const loadDivisions = () => request('/users/divisions').then(setDivisions).catch(() => {});
-  const loadDelegations = () => request('/delegations').then(setDelegations).catch(() => {});
+  }, [request]);
+
+  const loadRoles = useCallback(() => request('/users/roles').then(setRoles).catch(() => {}), [request]);
+  const loadDivisions = useCallback(() => request('/users/divisions').then(setDivisions).catch(() => {}), [request]);
 
   const usersTotalPages = Math.max(1, Math.ceil(usersTotal / usersLimit));
 
-  /** Page numbers to show in pagination (e.g. [1, 2, 3, '...', 9, 10]) */
-  const paginationPageNumbers = (() => {
+  const paginationPageNumbers = useMemo(() => {
     const total = usersTotalPages;
     const current = usersPage;
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -109,89 +121,40 @@ export default function AdminView() {
       prev = p;
     }
     return out;
-  })();
+  }, [usersTotalPages, usersPage]);
 
   useEffect(() => {
     loadDivisions();
     loadRoles();
     loadUsers(1);
     loadAllUsersForSelect();
-  }, [request]);
-  useEffect(() => {
-    if (tab === 'delegations') {
-      loadDelegations();
-      if (allUsersForSelect.length === 0) loadAllUsersForSelect();
-    }
-  }, [tab, request]);
+  }, [loadDivisions, loadRoles, loadUsers, loadAllUsersForSelect]);
 
-  const handleCreateUser = async (e) => {
-    e.preventDefault();
-    const f = userForm;
-    if (!f?.full_name || !f?.email || !f?.password) {
-      setError('Name, email and password required');
-      return;
-    }
+  const handleSaveUser = async (formData) => {
     setLoading(true);
     setError('');
     try {
-      await request('/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          full_name: f.full_name,
-          username: f.username?.trim() || null,
-          email: f.email,
-          password: f.password,
-          vnpf_no: f.vnpf_no || null,
-          post_title: f.post_title || null,
-          post_no: f.post_no || null,
-          grade: f.grade || null,
-          department: f.department?.trim() || null,
-          ministry: f.ministry?.trim() || null,
-          entry_date: f.entry_date?.trim() || null,
-          division_id: f.division_id ? parseInt(f.division_id, 10) : null,
-          reports_to_id: f.reports_to_id ? parseInt(f.reports_to_id, 10) : null,
-          role_ids: f.role_ids?.length ? f.role_ids : (roles[0] ? [roles[0].id] : []),
-        }),
-      });
-      setUserForm(null);
-      loadUsers(usersPage);
-      loadAllUsersForSelect();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdateUser = async (e) => {
-    e.preventDefault();
-    const f = userForm;
-    if (!f?.id || !f?.full_name || !f?.email) {
-      setError('Name and email required');
-      return;
-    }
-    setLoading(true);
-    setError('');
-    try {
+      const method = formData.mode === 'create' ? 'POST' : 'PATCH';
+      const url = formData.mode === 'create' ? '/users' : `/users/${formData.id}`;
       const body = {
-        full_name: f.full_name?.trim() || '',
-        username: f.username?.trim() || null,
-        email: (f.email || '').trim(),
-        vnpf_no: f.vnpf_no || null,
-        post_title: f.post_title || null,
-        post_no: f.post_no || null,
-        grade: f.grade || null,
-        department: f.department?.trim() || null,
-        ministry: f.ministry?.trim() || null,
-        entry_date: f.entry_date?.trim() || null,
-        division_id: f.division_id ? parseInt(f.division_id, 10) : null,
-        reports_to_id: f.reports_to_id ? parseInt(f.reports_to_id, 10) : null,
-        role_ids: f.role_ids || [],
+        full_name: formData.full_name?.trim() || '',
+        username: formData.username?.trim() || null,
+        email: (formData.email || '').trim(),
+        vnpf_no: formData.vnpf_no || null,
+        post_title: formData.post_title || null,
+        post_no: formData.post_no || null,
+        grade: formData.grade || null,
+        department: formData.department?.trim() || null,
+        ministry: formData.ministry?.trim() || null,
+        entry_date: formData.entry_date?.trim() || null,
+        division_id: formData.division_id ? parseInt(formData.division_id, 10) : null,
+        reports_to_id: formData.reports_to_id ? parseInt(formData.reports_to_id, 10) : null,
+        role_ids: formData.role_ids || [],
       };
-      if (f.password && f.password.trim()) body.password = f.password;
-      await request(`/users/${f.id}`, {
-        method: 'PATCH',
+      if (formData.password && formData.password.trim()) body.password = formData.password;
+
+      await request(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
@@ -205,13 +168,7 @@ export default function AdminView() {
     }
   };
 
-  const parseRoleIds = (roleIds) => {
-    if (Array.isArray(roleIds)) return roleIds.map(Number).filter((n) => !Number.isNaN(n));
-    if (typeof roleIds === 'string') return roleIds.replace(/^\{|\}$/g, '').split(',').map((n) => parseInt(n.trim(), 10)).filter((n) => !Number.isNaN(n));
-    return [];
-  };
-
-  const openEditUser = (u) => {
+  const openEditUser = useCallback((u) => {
     setUserForm({
       mode: 'edit',
       id: u.id,
@@ -231,7 +188,7 @@ export default function AdminView() {
       role_ids: parseRoleIds(u.role_ids),
     });
     setError('');
-  };
+  }, []);
 
   const handleDeleteUser = async () => {
     if (!deleteConfirm || deleteConfirm.type !== 'single') return;
@@ -250,22 +207,22 @@ export default function AdminView() {
     }
   };
 
-  const toggleUserSelection = (id) => {
+  const toggleUserSelection = useCallback((id) => {
     setSelectedUserIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  };
+  }, []);
 
-  const selectAllUsersOnPage = () => {
+  const selectAllUsersOnPage = useCallback(() => {
     setSelectedUserIds(new Set(users.map((u) => u.id)));
-  };
+  }, [users]);
 
-  const clearUserSelection = () => {
+  const clearUserSelection = useCallback(() => {
     setSelectedUserIds(new Set());
-  };
+  }, []);
 
   const handleBulkDelete = async () => {
     if (!deleteConfirm || deleteConfirm.type !== 'bulk' || selectedUserIds.size === 0) return;
@@ -288,47 +245,6 @@ export default function AdminView() {
     }
   };
 
-  const handleCreateDelegation = async (e) => {
-    e.preventDefault();
-    if (!delegForm.delegator_id || !delegForm.delegatee_id || !delegForm.start_date || !delegForm.end_date) {
-      setError('All delegation fields required');
-      return;
-    }
-    setLoading(true);
-    setError('');
-    try {
-      await request('/delegations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          delegator_id: parseInt(delegForm.delegator_id, 10),
-          delegatee_id: parseInt(delegForm.delegatee_id, 10),
-          start_date: delegForm.start_date,
-          end_date: delegForm.end_date,
-        }),
-      });
-      setDelegForm({ delegator_id: '', delegatee_id: '', start_date: '', end_date: '' });
-      loadDelegations();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const deactivateDelegation = async (id) => {
-    try {
-      await request(`/delegations/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: false }),
-      });
-      loadDelegations();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
   const handleResendPendingEmails = async () => {
     setError('');
     setResendResult(null);
@@ -347,7 +263,7 @@ export default function AdminView() {
     }
   };
 
-  const openAdModal = () => {
+  const openAdModal = useCallback(() => {
     setAdModalOpen(true);
     setAdUsername('');
     setAdPassword('');
@@ -356,7 +272,7 @@ export default function AdminView() {
     setAdFetchedUsers([]);
     setAdSelectedUsernames(new Set());
     setAdSearchFilter('');
-  };
+  }, []);
 
   const handleFetchFromAd = async (e) => {
     e.preventDefault();
@@ -387,21 +303,21 @@ export default function AdminView() {
     }
   };
 
-  const toggleAdUser = (username) => {
-    setAdSelectedUsernames((prev) => {
+  const toggleAdUser = useCallback((username) => {
+    setSelectedUserIds((prev) => {
       const next = new Set(prev);
       if (next.has(username)) next.delete(username);
       else next.add(username);
       return next;
     });
-  };
+  }, []);
 
-  const selectAllAdUsers = (visibleOnly = false) => {
+  const selectAllAdUsers = useCallback((visibleOnly = false) => {
     const list = visibleOnly && adSearchFilter.trim() ? adFilteredUsers : adFetchedUsers;
     setAdSelectedUsernames(new Set(list.map((u) => u.username).filter(Boolean)));
-  };
+  }, [adSearchFilter, adFilteredUsers, adFetchedUsers]);
 
-  const deselectAllAdUsers = (visibleOnly = false) => {
+  const deselectAllAdUsers = useCallback((visibleOnly = false) => {
     if (visibleOnly && adSearchFilter.trim()) {
       const visible = new Set(adFilteredUsers.map((u) => u.username).filter(Boolean));
       setAdSelectedUsernames((prev) => {
@@ -412,18 +328,20 @@ export default function AdminView() {
     } else {
       setAdSelectedUsernames(new Set());
     }
-  };
+  }, [adSearchFilter, adFilteredUsers]);
 
   const adSearchLower = adSearchFilter.trim().toLowerCase();
-  const adFilteredUsers = adSearchLower
-    ? adFetchedUsers.filter((u) => {
-        const name = (u.full_name || '').toLowerCase();
-        const un = (u.username || '').toLowerCase();
-        const em = (u.email || '').toLowerCase();
-        const div = (u.division_name || '').toLowerCase();
-        return name.includes(adSearchLower) || un.includes(adSearchLower) || em.includes(adSearchLower) || div.includes(adSearchLower);
-      })
-    : adFetchedUsers;
+  const adFilteredUsers = useMemo(() => {
+    return adSearchLower
+      ? adFetchedUsers.filter((u) => {
+          const name = (u.full_name || '').toLowerCase();
+          const un = (u.username || '').toLowerCase();
+          const em = (u.email || '').toLowerCase();
+          const div = (u.division_name || '').toLowerCase();
+          return name.includes(adSearchLower) || un.includes(adSearchLower) || em.includes(adSearchLower) || div.includes(adSearchLower);
+        })
+      : adFetchedUsers;
+  }, [adFetchedUsers, adSearchLower]);
 
   const handleImportSelectedAdUsers = async () => {
     const toImport = adFetchedUsers.filter((u) => u.username && adSelectedUsernames.has(u.username));
@@ -450,8 +368,10 @@ export default function AdminView() {
     }
   };
 
-  const isCreate = userForm?.mode === 'create';
-  const isEdit = userForm?.mode === 'edit';
+  const openUserBalanceManagement = useCallback((user) => {
+    setSelectedUserForBalances(user);
+    setTab('balanceManagement');
+  }, []);
 
   return (
     <>
@@ -487,6 +407,12 @@ export default function AdminView() {
         <button type="button" className={`tab ${tab === 'delegations' ? 'active' : ''}`} onClick={() => setTab('delegations')}>
           Delegation tool
         </button>
+        <button type="button" className={`tab ${tab === 'balanceManagement' ? 'active' : ''}`} onClick={() => setTab('balanceManagement')} disabled={!selectedUserForBalances}>
+          Balance Management {selectedUserForBalances ? `(${selectedUserForBalances.full_name})` : ''}
+        </button>
+        <button type="button" className={`tab ${tab === 'leavePolicies' ? 'active' : ''}`} onClick={() => setTab('leavePolicies')}>
+          Leave Policies
+        </button>
       </div>
 
       {error && <div className="alert alert-danger">{error}</div>}
@@ -498,14 +424,23 @@ export default function AdminView() {
             onAddUser={() => setUserForm({ mode: 'create', ...emptyUserForm(roles[0]?.id) })}
           />
 
-          <DivisionFilter
-            value={divisionFilter}
-            divisions={divisions}
-            onChange={(newDivision) => {
-              setDivisionFilter(newDivision);
-              loadUsers(1, newDivision);
-            }}
-          />
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'end', flexWrap: 'wrap' }}>
+            <DivisionFilter
+              value={divisionFilter}
+              divisions={divisions}
+              onChange={(newDivision) => {
+                setDivisionFilter(newDivision);
+                loadUsers(1, newDivision, usersSearch);
+              }}
+            />
+            <UsersSearchFilter
+              value={usersSearch}
+              onChange={(nextSearch) => {
+                setUsersSearch(nextSearch);
+                loadUsers(1, divisionFilter, nextSearch);
+              }}
+            />
+          </div>
 
           <UserBulkActions
             selectedCount={selectedUserIds.size}
@@ -528,6 +463,7 @@ export default function AdminView() {
             onClearSelection={clearUserSelection}
             onEditUser={openEditUser}
             onDeleteUser={(u) => setDeleteConfirm({ type: 'single', id: u.id, full_name: u.full_name })}
+            onManageBalances={openUserBalanceManagement}
           />
 
           <UsersPagination
@@ -609,7 +545,7 @@ export default function AdminView() {
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <Button type="submit" variant="primary" loading={syncLoading} loadingText="Fetching…">Fetch from AD</Button>
-                  <Button type="button" variant="secondary" onClick={() => { setAdModalOpen(false); setSyncError(''); setSyncResult(null); }} disabled={syncLoading}>Cancel</Button>
+                  <Button type="button" variant="secondary" onClick={() => { setAdModalOpen(false); setAdFetchedUsers([]); setAdSelectedUsernames(new Set()); setAdSearchFilter(''); setSyncError(''); setSyncResult(null); }} disabled={syncLoading}>Cancel</Button>
                 </div>
               </form>
             </>
@@ -700,246 +636,44 @@ export default function AdminView() {
         loadingText="Deleting…"
       />
 
-      {(isCreate || isEdit) && userForm && (
-        <Modal
-          open={Boolean((isCreate || isEdit) && userForm)}
-          title={isCreate ? 'New user' : 'Edit user'}
-          titleId="user-form-modal-title"
-          maxWidth={640}
-          style={{ maxHeight: '90vh', overflow: 'auto' }}
-          closeOnBackdrop={!loading}
+      {userForm && (
+        <UserFormModal
+          userForm={userForm}
+          setUserForm={setUserForm}
+          onSave={handleSaveUser}
           onClose={() => setUserForm(null)}
-        >
-            <form
-              onSubmit={isCreate ? handleCreateUser : handleUpdateUser}
-              style={{ marginTop: '0.5rem' }}
-            >
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="form-group">
-                  <label>Full name *</label>
-                  <input
-                    value={userForm.full_name}
-                    onChange={(e) => setUserForm((f) => ({ ...f, full_name: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Username</label>
-                  <input
-                    value={userForm.username}
-                    onChange={(e) => setUserForm((f) => ({ ...f, username: e.target.value }))}
-                    placeholder="e.g. imichel (for login)"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Email *</label>
-                  <input
-                    type="email"
-                    value={userForm.email}
-                    onChange={(e) => setUserForm((f) => ({ ...f, email: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Password {isEdit && '(leave blank to keep current)'}</label>
-                  <input
-                    type="password"
-                    value={userForm.password}
-                    onChange={(e) => setUserForm((f) => ({ ...f, password: e.target.value }))}
-                    required={isCreate}
-                    placeholder={isEdit ? '••••••••' : ''}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>VNPF no</label>
-                  <input
-                    value={userForm.vnpf_no}
-                    onChange={(e) => setUserForm((f) => ({ ...f, vnpf_no: e.target.value }))}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Post title</label>
-                  <input
-                    value={userForm.post_title}
-                    onChange={(e) => setUserForm((f) => ({ ...f, post_title: e.target.value }))}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Post no</label>
-                  <input
-                    value={userForm.post_no}
-                    onChange={(e) => setUserForm((f) => ({ ...f, post_no: e.target.value }))}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Grade</label>
-                  <input
-                    value={userForm.grade}
-                    onChange={(e) => setUserForm((f) => ({ ...f, grade: e.target.value }))}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Department</label>
-                  <input
-                    value={userForm.department}
-                    onChange={(e) => setUserForm((f) => ({ ...f, department: e.target.value }))}
-                    placeholder="e.g. VMGD"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Ministry</label>
-                  <input
-                    value={userForm.ministry}
-                    onChange={(e) => setUserForm((f) => ({ ...f, ministry: e.target.value }))}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Entry date of service</label>
-                  <input
-                    type="date"
-                    value={userForm.entry_date}
-                    onChange={(e) => setUserForm((f) => ({ ...f, entry_date: e.target.value }))}
-                    title="Date when staff entered service or took their post"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Division</label>
-                  <SearchableSelect
-                    value={userForm.division_id ?? ''}
-                    options={divisions}
-                    getOptionLabel={(d) => d.name}
-                    onChange={(v) => setUserForm((f) => ({ ...f, division_id: v ?? '' }))}
-                    placeholder="—"
-                    emptyOptionLabel="—"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Reports to</label>
-                  <SearchableSelect
-                    value={userForm.reports_to_id ?? ''}
-                    options={allUsersForSelect || []}
-                    getOptionLabel={(u) => u.full_name}
-                    onChange={(v) => setUserForm((f) => ({ ...f, reports_to_id: v ?? '' }))}
-                    placeholder="—"
-                    emptyOptionLabel="—"
-                    excludeId={userForm.id}
-                  />
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Roles</label>
-                <div className="badge-group" style={{ gap: '0.5rem' }}>
-                  {roles.map((r) => (
-                    <label key={r.id} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
-                      <input
-                        type="checkbox"
-                        checked={(userForm.role_ids || []).includes(r.id)}
-                        onChange={(e) => setUserForm((f) => ({
-                          ...f,
-                          role_ids: e.target.checked
-                            ? [...(f.role_ids || []), r.id]
-                            : (f.role_ids || []).filter((rid) => rid !== r.id),
-                        }))}
-                        style={{ marginRight: '0.35rem' }}
-                      />
-                      <span className="badge" style={{ marginBottom: 0 }}>{r.role_name}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <Button type="submit" variant="primary" loading={loading} loadingText={isCreate ? 'Creating…' : 'Saving…'}>
-                  {isCreate ? 'Create user' : 'Save changes'}
-                </Button>
-                <Button type="button" variant="secondary" onClick={() => setUserForm(null)}>Cancel</Button>
-              </div>
-            </form>
-        </Modal>
+          loading={loading}
+          error={error}
+          roles={roles}
+          divisions={divisions}
+          allUsersForSelect={allUsersForSelect}
+        />
       )}
 
       {tab === 'delegations' && (
-        <>
-          <div className="card">
-            <h3 className="section-title">Set Acting supervisor</h3>
-            <p className="card-subtitle">
-              Assign a delegatee to act as the delegator for a date range. The delegatee will receive notifications and approval rights for that period.
-            </p>
-            <form onSubmit={handleCreateDelegation} style={{ maxWidth: 500 }}>
-              <div className="form-group">
-                <label>Delegator (person away)</label>
-                <SearchableSelect
-                  value={delegForm.delegator_id}
-                  options={allUsersForSelect || []}
-                  getOptionLabel={(u) => `${u.full_name} (${u.email || ''})`}
-                  onChange={(v) => setDelegForm((f) => ({ ...f, delegator_id: v ?? '' }))}
-                  placeholder="Select..."
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label>Delegatee (acting)</label>
-                <SearchableSelect
-                  value={delegForm.delegatee_id}
-                  options={allUsersForSelect || []}
-                  getOptionLabel={(u) => `${u.full_name} (${u.email || ''})`}
-                  onChange={(v) => setDelegForm((f) => ({ ...f, delegatee_id: v ?? '' }))}
-                  placeholder="Select..."
-                  required
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div className="form-group">
-                  <label>Start date</label>
-                  <input type="date" value={delegForm.start_date} onChange={(e) => setDelegForm((f) => ({ ...f, start_date: e.target.value }))} required />
-                </div>
-                <div className="form-group">
-                  <label>End date</label>
-                  <input type="date" value={delegForm.end_date} onChange={(e) => setDelegForm((f) => ({ ...f, end_date: e.target.value }))} required />
-                </div>
-              </div>
-              <Button type="submit" variant="primary" loading={loading} loadingText="Creating…">Create delegation</Button>
-            </form>
-          </div>
-          <div className="card">
-            <h3 className="section-title">Active delegations</h3>
-            {delegations.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)' }}>None.</p>
-            ) : (
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Delegator</th>
-                      <th>Delegatee</th>
-                      <th>Start</th>
-                      <th>End</th>
-                      <th>Active</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {delegations.map((d) => (
-                      <tr key={d.id}>
-                        <td>{d.delegator_name}</td>
-                        <td>{d.delegatee_name}</td>
-                        <td>{d.start_date}</td>
-                        <td>{d.end_date}</td>
-                        <td>{d.is_active ? 'Yes' : 'No'}</td>
-                        <td>
-                          {d.is_active && (
-                            <Button type="button" variant="secondary" size="sm" style={{ padding: '0.25rem 0.5rem' }} onClick={() => deactivateDelegation(d.id)}>
-                              Deactivate
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </>
+        <DelegationManagement
+          allUsersForSelect={allUsersForSelect}
+          loadAllUsersForSelect={loadAllUsersForSelect}
+          loading={loading}
+          error={error}
+          setError={setError}
+        />
+      )}
+
+      {tab === 'balanceManagement' && selectedUserForBalances && (
+        <div className="card">
+          <h3 className="section-title">Leave Balances for {selectedUserForBalances.full_name} ({selectedUserForBalances.email})</h3>
+          <UserBalanceManagement
+            userId={selectedUserForBalances.id}
+            onError={setError}
+          />
+        </div>
+      )}
+
+      {tab === 'leavePolicies' && (
+        <LeavePolicyManagement
+          onError={setError}
+        />
       )}
     </>
   );
