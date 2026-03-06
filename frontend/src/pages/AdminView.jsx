@@ -71,7 +71,7 @@ export default function AdminView() {
   const [selectedUserIds, setSelectedUserIds] = useState(new Set());
   const [selectedUserForBalances, setSelectedUserForBalances] = useState(null);
 
-  const loadUsers = useCallback((page = usersPage, divisionIdOverride = undefined, searchOverride = undefined) => {
+  const loadUsers = useCallback((page = 1, divisionIdOverride = undefined, searchOverride = undefined) => {
     setUsersLoading(true);
     const params = new URLSearchParams({ page: String(page), limit: String(usersLimit) });
     const division = divisionIdOverride !== undefined ? divisionIdOverride : divisionFilter;
@@ -86,7 +86,7 @@ export default function AdminView() {
       })
       .catch(() => {})
       .finally(() => setUsersLoading(false));
-  }, [request, usersPage, usersLimit, divisionFilter, usersSearch]);
+  }, [request, usersLimit, divisionFilter, usersSearch]);
 
   const loadAllUsersForSelect = useCallback(() => {
     return request('/users?limit=5000')
@@ -304,13 +304,26 @@ export default function AdminView() {
   };
 
   const toggleAdUser = useCallback((username) => {
-    setSelectedUserIds((prev) => {
+    setAdSelectedUsernames((prev) => {
       const next = new Set(prev);
       if (next.has(username)) next.delete(username);
       else next.add(username);
       return next;
     });
   }, []);
+
+  const adSearchLower = adSearchFilter.trim().toLowerCase();
+  const adFilteredUsers = useMemo(() => {
+    return adSearchLower
+      ? adFetchedUsers.filter((u) => {
+          const name = (u.full_name || '').toLowerCase();
+          const un = (u.username || '').toLowerCase();
+          const em = (u.email || '').toLowerCase();
+          const div = (u.division_name || '').toLowerCase();
+          return name.includes(adSearchLower) || un.includes(adSearchLower) || em.includes(adSearchLower) || div.includes(adSearchLower);
+        })
+      : adFetchedUsers;
+  }, [adFetchedUsers, adSearchLower]);
 
   const selectAllAdUsers = useCallback((visibleOnly = false) => {
     const list = visibleOnly && adSearchFilter.trim() ? adFilteredUsers : adFetchedUsers;
@@ -329,19 +342,6 @@ export default function AdminView() {
       setAdSelectedUsernames(new Set());
     }
   }, [adSearchFilter, adFilteredUsers]);
-
-  const adSearchLower = adSearchFilter.trim().toLowerCase();
-  const adFilteredUsers = useMemo(() => {
-    return adSearchLower
-      ? adFetchedUsers.filter((u) => {
-          const name = (u.full_name || '').toLowerCase();
-          const un = (u.username || '').toLowerCase();
-          const em = (u.email || '').toLowerCase();
-          const div = (u.division_name || '').toLowerCase();
-          return name.includes(adSearchLower) || un.includes(adSearchLower) || em.includes(adSearchLower) || div.includes(adSearchLower);
-        })
-      : adFetchedUsers;
-  }, [adFetchedUsers, adSearchLower]);
 
   const handleImportSelectedAdUsers = async () => {
     const toImport = adFetchedUsers.filter((u) => u.username && adSelectedUsernames.has(u.username));

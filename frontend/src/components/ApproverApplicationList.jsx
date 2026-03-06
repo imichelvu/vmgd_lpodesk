@@ -3,7 +3,7 @@
  * Purpose: Reusable component for displaying paginated leave application lists for approvers, including division filter.
  * Last updated: 2026-02-09
  */
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { useAuth, ROLE_IDS } from '../context/AuthContext';
@@ -21,6 +21,7 @@ export default function ApproverApplicationList({ endpoint, pageTitle, emptyMess
   const { hasRole } = useAuth();
   const { request } = useApi();
   const [applications, setApplications] = useState([]);
+  const [divisions, setDivisions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -116,6 +117,19 @@ export default function ApproverApplicationList({ endpoint, pageTitle, emptyMess
   }, [request]);
 
   useEffect(() => {
+    const fetchDivisions = async () => {
+      try {
+        const data = await request('/users/divisions');
+        setDivisions(Array.isArray(data) ? data : []);
+      } catch (e) {
+        console.error('Failed to load divisions:', e);
+        setDivisions([]);
+      }
+    };
+    fetchDivisions();
+  }, [request]);
+
+  useEffect(() => {
     loadApplications(1, divisionFilter, leaveTypeFilter, fromDateFilter, toDateFilter, pageSize); // Load applications when component mounts, filter, or page size changes
   }, [divisionFilter, leaveTypeFilter, fromDateFilter, toDateFilter, pageSize, loadApplications]); // Added date filters to dependencies
 
@@ -170,18 +184,6 @@ export default function ApproverApplicationList({ endpoint, pageTitle, emptyMess
     }
   }, [actionDraft, request, resetDraft, loadApplications, currentPage, divisionFilter, leaveTypeFilter, fromDateFilter, toDateFilter, pageSize]); // Added date filters to dependencies
 
-  const allDivisions = useMemo(() => {
-    // This should ideally come from a common context or a shared API call if used widely
-    return [
-      { id: 1, name: 'ICT_Engineering' },
-      { id: 2, name: 'Climate' },
-      { id: 3, name: 'Forecast' },
-      { id: 4, name: 'Geo-Hazards' },
-      { id: 5, name: 'Admin' },
-      { id: 6, name: 'Observations' },
-    ];
-  }, []);
-
   const handleDivisionChange = useCallback((newDivisionId) => {
     setDivisionFilter(newDivisionId);
     setCurrentPage(1);
@@ -231,7 +233,7 @@ export default function ApproverApplicationList({ endpoint, pageTitle, emptyMess
       <div style={{ display: 'flex', gap: '1rem', alignItems: 'end', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
         <DivisionFilter
           value={divisionFilter}
-          divisions={allDivisions}
+          divisions={divisions}
           onChange={handleDivisionChange}
           placeholder="Filter by division"
         />
@@ -297,7 +299,7 @@ export default function ApproverApplicationList({ endpoint, pageTitle, emptyMess
         </div>
       </div>
 
-      {!isPendingView && recentActionsCount > 0 && (
+      {!isPendingView && (
         <p className="text-muted">{recentActionsCount} actions in the last 7 days</p>
       )}
 
@@ -326,6 +328,12 @@ export default function ApproverApplicationList({ endpoint, pageTitle, emptyMess
                         <span className="text-muted">
                           {app.division_name || '—'} · {app.leave_type} · {formatLeaveStart(app)}
                         </span>
+                        {getUrgencyClass(app).includes('past-start') && (
+                          <span className="urgency-chip urgency-chip-overdue">Overdue start date</span>
+                        )}
+                        {getUrgencyClass(app).includes('starting-soon') && (
+                          <span className="urgency-chip urgency-chip-soon">Starts soon</span>
+                        )}
                       </div>
                       <StatusBadge status={app.status} />
                     </summary>

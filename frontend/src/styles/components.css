@@ -410,6 +410,27 @@ tr:hover td { background: var(--surface-hover); }
 }
 .dashboard-accordion-summary::-webkit-details-marker { display: none; }
 .dashboard-accordion-headline { display: grid; gap: 2px; min-width: 0; }
+.urgency-chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: 999px;
+  padding: 4px 8px;
+  margin-top: 4px;
+}
+.urgency-chip-overdue {
+  color: #a4262c;
+  background: var(--danger-soft);
+  border: 1px solid var(--danger);
+}
+.urgency-chip-soon {
+  color: #8a5a00;
+  background: var(--warning-soft);
+  border: 1px solid var(--warning);
+}
 .dashboard-accordion-content {
   border-top: 1px solid var(--border);
   padding: 12px;

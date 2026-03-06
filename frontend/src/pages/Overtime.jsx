@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import Button from '../components/Button';
 import StatsRow from '../components/StatsRow';
+import Modal from '../components/Modal';
 import { useApi } from '../hooks/useApi';
 
 const PURPOSE_OVERTIME_PAYMENT = 'Overtime Payment';
@@ -27,6 +28,8 @@ export default function Overtime() {
   const [form, setForm] = useState(INITIAL_FORM);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [entryModalOpen, setEntryModalOpen] = useState(false);
+  const startDateTimeInputRef = useRef(null);
 
   const [entries, setEntries] = useState([]);
   const [loadingEntries, setLoadingEntries] = useState(false);
@@ -104,9 +107,16 @@ export default function Overtime() {
     loadSummary(fromDateFilter, toDateFilter);
   }, [purposeFilter, fromDateFilter, toDateFilter, loadEntries, loadSummary]);
 
+  useEffect(() => {
+    if (!entryModalOpen) return undefined;
+    const focusTimer = setTimeout(() => {
+      startDateTimeInputRef.current?.focus();
+    }, 0);
+    return () => clearTimeout(focusTimer);
+  }, [entryModalOpen]);
+
   const stats = useMemo(() => ([
     { label: 'Total extra hours', value: summary.total_hours.toFixed(1), tone: 'default' },
-    { label: 'Overtime payment hours', value: summary.overtime_payment_hours.toFixed(1), tone: 'warning' },
     { label: 'TOIL hours', value: summary.toil_hours.toFixed(1), tone: 'success' },
     { label: 'TOIL day equivalent', value: summary.toil_days_equivalent.toFixed(2), tone: 'default', hint: 'Based on 8h workday' },
   ]), [summary]);
@@ -126,6 +136,7 @@ export default function Overtime() {
         }),
       });
       setForm(INITIAL_FORM);
+      setEntryModalOpen(false);
       await loadEntries(1, purposeFilter, fromDateFilter, toDateFilter);
       await loadSummary(fromDateFilter, toDateFilter);
     } catch (err) {
@@ -155,7 +166,35 @@ export default function Overtime() {
       <StatsRow items={stats} />
 
       <div className="card">
-        <h3 className="dashboard-section-title">Record extra hours</h3>
+        <div className="dashboard-section-title-row">
+          <h3 className="dashboard-section-title">Record extra hours</h3>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => {
+              setForm(INITIAL_FORM);
+              setSubmitError('');
+              setEntryModalOpen(true);
+            }}
+          >
+            Add overtime entry
+          </Button>
+        </div>
+        <p className="text-muted">
+          Use the button above to record extra working hours.
+        </p>
+      </div>
+
+      <Modal
+        open={entryModalOpen}
+        title="Record extra hours"
+        titleId="overtime-entry-modal-title"
+        maxWidth={560}
+        onClose={() => {
+          setEntryModalOpen(false);
+          setSubmitError('');
+        }}
+      >
         {submitError ? <div className="alert alert-danger">{submitError}</div> : null}
         <form onSubmit={handleCreate}>
           <div className="form-row form-row-2">
@@ -164,6 +203,7 @@ export default function Overtime() {
               <input
                 id="ot-start-datetime"
                 type="datetime-local"
+                ref={startDateTimeInputRef}
                 value={form.start_datetime}
                 onChange={(e) => setForm((prev) => ({ ...prev, start_datetime: e.target.value }))}
                 required
@@ -195,11 +235,24 @@ export default function Overtime() {
             />
           </div>
 
-          <Button type="submit" variant="primary" loading={submitLoading} loadingText="Saving...">
-            Save overtime entry
-          </Button>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <Button type="submit" variant="primary" loading={submitLoading} loadingText="Saving...">
+              Save overtime entry
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setEntryModalOpen(false);
+                setSubmitError('');
+              }}
+              disabled={submitLoading}
+            >
+              Cancel
+            </Button>
+          </div>
         </form>
-      </div>
+      </Modal>
 
       <div className="card">
         <div className="dashboard-section-title-row">
@@ -208,19 +261,6 @@ export default function Overtime() {
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'end', flexWrap: 'wrap' }}>
-          <div className="form-group" style={{ marginBottom: '1rem', maxWidth: 220 }}>
-            <label htmlFor="ot-filter-purpose">Filter by purpose</label>
-            <select
-              id="ot-filter-purpose"
-              value={purposeFilter}
-              onChange={(e) => { setPurposeFilter(e.target.value); setPage(1); }}
-              disabled={loadingEntries}
-            >
-              <option value="">All</option>
-              <option value={PURPOSE_OVERTIME_PAYMENT}>{PURPOSE_OVERTIME_PAYMENT}</option>
-              <option value={PURPOSE_TOIL}>{PURPOSE_TOIL}</option>
-            </select>
-          </div>
           <div className="form-group" style={{ marginBottom: '1rem', maxWidth: 180 }}>
             <label htmlFor="ot-filter-from">From date</label>
             <input
