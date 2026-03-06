@@ -15,6 +15,7 @@ import DirectorView from './pages/DirectorView';
 import AdminView from './pages/AdminView';
 import ApplicationDetail from './pages/ApplicationDetail';
 import ApplicationPrint from './pages/ApplicationPrint';
+import Profile from './pages/Profile';
 import AppLoader from './components/AppLoader';
 
 function PrivateRoute({ children, allowedRoleIds }) {
@@ -42,6 +43,7 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
+        <Route path="profile" element={<Profile />} />
         <Route path="apply" element={<NewApplication />} />
         <Route path="overtime" element={<Overtime />} />
         <Route path="faq" element={<Faq />} />

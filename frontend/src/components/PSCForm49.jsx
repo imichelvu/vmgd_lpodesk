@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { getWorkingDays, getWorkingDaysFromDateTime, isAdvancePayWarning } from '../utils/workingDays';
-import SignatureField from './SignatureField';
+import { useAuth } from '../context/AuthContext';
 import Button from './Button';
 
 const LEAVE_TYPES = [
@@ -25,6 +26,7 @@ export default function PSCForm49({
   destinationSuggestions = [],
 }) {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const { user } = useAuth();
   const [leave_type, setLeaveType] = useState(initialValues?.leave_type || '');
   const [destination, setDestination] = useState(initialValues?.destination || '');
   const [start_date, setStartDate] = useState(initialValues?.start_date || '');
@@ -35,7 +37,6 @@ export default function PSCForm49({
   const [advance_pay, setAdvancePay] = useState(!!initialValues?.advance_pay);
   const [advance_pay_date, setAdvancePayDate] = useState(initialValues?.advance_pay_date || '');
   const [reason_or_remarks, setReasonOrRemarks] = useState(initialValues?.reason_or_remarks || '');
-  const [signature_data, setSignatureData] = useState(initialValues?.signature_data || null);
 
   const useDateTimeRange = is_half_day;
 
@@ -113,7 +114,6 @@ export default function PSCForm49({
       advance_pay,
       advance_pay_date,
       reason_or_remarks,
-      signature_data,
     });
   }, [
     onFormChange,
@@ -128,7 +128,6 @@ export default function PSCForm49({
     advance_pay,
     advance_pay_date,
     reason_or_remarks,
-    signature_data,
   ]);
 
   const handleSubmit = (e) => {
@@ -145,7 +144,7 @@ export default function PSCForm49({
       advance_pay,
       advance_pay_date: advance_pay ? advance_pay_date || null : null,
       reason_or_remarks: reason_or_remarks || null,
-      signature_data,
+      // signature_data is fetched from the user's profile on the backend — not sent here
     });
   };
 
@@ -352,23 +351,31 @@ export default function PSCForm49({
         </div>
       </section>
 
-      {/* Signature */}
+      {/* Signature — uses the applicant's registered profile signature automatically */}
       <section className="form-section">
-        <SignatureField
-          label="Applicant signature"
-          required
-          width={320}
-          height={120}
-          value={typeof signature_data === 'string' ? signature_data : null}
-          onChange={setSignatureData}
-        />
+        <h4 className="section-title section-title-sm">Applicant Signature</h4>
+        {user?.has_signature ? (
+          <div className="alert alert-success" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span>✓</span>
+            <span>Your registered signature will be applied automatically upon submission.</span>
+            <Link to="/profile" style={{ marginLeft: 'auto', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
+              Change signature
+            </Link>
+          </div>
+        ) : (
+          <div className="alert alert-warning">
+            You have not registered a signature yet.{' '}
+            <Link to="/profile"><strong>Register your signature in My Profile</strong></Link>{' '}
+            before you can submit a leave application.
+          </div>
+        )}
       </section>
 
       <div className="form-actions">
         <Button
           type="submit"
           variant="primary"
-          disabled={!signature_data || dateTimeRangeInvalid}
+          disabled={!user?.has_signature || dateTimeRangeInvalid}
           loading={loading}
           loadingText="Submitting..."
         >

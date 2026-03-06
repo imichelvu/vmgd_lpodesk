@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS users (
   division_id INTEGER REFERENCES divisions(id),
   reports_to_id INTEGER REFERENCES users(id),
   source VARCHAR(20) NOT NULL DEFAULT 'local',
+  signature_data TEXT,                              -- registered base64 PNG signature; used automatically for leave applications and approvals
+  signature_updated_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

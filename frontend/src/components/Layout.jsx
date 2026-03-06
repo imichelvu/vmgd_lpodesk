@@ -11,6 +11,7 @@ import TopBanner from './TopBanner';
 
 const ROUTE_TITLES = {
   '/': 'Dashboard',
+  '/profile': 'My Profile',
   '/apply': 'New application',
   '/overtime': 'Overtime & TOIL',
   '/faq': 'FAQ',
@@ -98,6 +99,12 @@ export default function Layout() {
               <NavLink to="/" end className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
                 <span className="nav-icon">🏠</span> Dashboard
               </NavLink>
+              <NavLink to="/profile" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+                <span className="nav-icon">👤</span> My Profile
+                {!user?.has_signature && (
+                  <span title="Signature not registered" style={{ marginLeft: 6, color: '#e0a000', fontWeight: 700, fontSize: '0.8rem' }}>⚠</span>
+                )}
+              </NavLink>
               <NavLink to="/apply" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
                 <span className="nav-icon">📝</span> New application
               </NavLink>
@@ -124,7 +131,10 @@ export default function Layout() {
               )}
             </div>
             <div className="app-nav-user">
-              <span className="app-user">{user?.full_name}</span>
+              <NavLink to="/profile" className="app-user" title="My Profile">
+                {user?.full_name}
+                {!user?.has_signature && <span style={{ marginLeft: 5, color: '#e0a000' }}>⚠</span>}
+              </NavLink>
               <button type="button" className="nav-logout" onClick={handleLogout}>
                 Logout
               </button>

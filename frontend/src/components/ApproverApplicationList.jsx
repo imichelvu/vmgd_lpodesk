@@ -8,7 +8,6 @@ import { Link } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { useAuth, ROLE_IDS } from '../context/AuthContext';
 import Button from './Button';
-import SignatureField from './SignatureField';
 import StatusBadge from './StatusBadge';
 import DivisionFilter from './admin/DivisionFilter';
 import StatsRow from './StatsRow'; // Import StatsRow
@@ -18,7 +17,7 @@ import { formatLeaveEnd, formatLeaveStart } from '../utils/leaveDateDisplay';
 const URGENT_DAYS_THRESHOLD = 3;
 
 export default function ApproverApplicationList({ endpoint, pageTitle, emptyMessage, onReloadParent }) {
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const { request } = useApi();
   const [applications, setApplications] = useState([]);
   const [divisions, setDivisions] = useState([]);
@@ -37,7 +36,6 @@ export default function ApproverApplicationList({ endpoint, pageTitle, emptyMess
     appId: null,
     action: null,
     comment: '',
-    signature: null,
     error: '',
   });
   const [recentActionsCount, setRecentActionsCount] = useState(0);
@@ -134,31 +132,15 @@ export default function ApproverApplicationList({ endpoint, pageTitle, emptyMess
   }, [divisionFilter, leaveTypeFilter, fromDateFilter, toDateFilter, pageSize, loadApplications]); // Added date filters to dependencies
 
   const resetDraft = useCallback(() => {
-    setActionDraft({
-      appId: null,
-      action: null,
-      comment: '',
-      signature: null,
-      error: '',
-    });
+    setActionDraft({ appId: null, action: null, comment: '', error: '' });
   }, []);
 
   const openActionDraft = useCallback((appId, action) => {
-    setActionDraft({
-      appId,
-      action,
-      comment: '',
-      signature: null,
-      error: '',
-    });
+    setActionDraft({ appId, action, comment: '', error: '' });
   }, []);
 
   const submitDecision = useCallback(async () => {
     if (!actionDraft.appId || !actionDraft.action) return;
-    if (!actionDraft.signature) {
-      setActionDraft((prev) => ({ ...prev, error: 'Signature is required before submitting.' }));
-      return;
-    }
     if (actionDraft.action === 'disapprove' && !actionDraft.comment.trim()) {
       setActionDraft((prev) => ({ ...prev, error: 'Comment is mandatory for disapproval.' }));
       return;
@@ -172,7 +154,7 @@ export default function ApproverApplicationList({ endpoint, pageTitle, emptyMess
         body: JSON.stringify({
           action: actionDraft.action,
           comment: actionDraft.comment.trim() || undefined,
-          approver_signature_data: actionDraft.signature,
+          // approver_signature_data is no longer sent — backend uses the approver's stored profile signature
         }),
       });
       resetDraft();
@@ -347,7 +329,15 @@ export default function ApproverApplicationList({ endpoint, pageTitle, emptyMess
                         <p><strong>Working days:</strong> {app.total_working_days}</p>
                       </div>
 
-                      {canApprove && !isDraftForItem && (
+                      {canApprove && !isDraftForItem && !user?.has_signature && (
+                        <div className="alert alert-warning" style={{ marginTop: '0.75rem' }}>
+                          You must{' '}
+                          <Link to="/profile"><strong>register your signature in My Profile</strong></Link>
+                          {' '}before you can approve or disapprove applications.
+                        </div>
+                      )}
+
+                      {canApprove && !isDraftForItem && user?.has_signature && (
                         <div className="dashboard-accordion-actions">
                           <Button type="button" variant="primary" onClick={() => openActionDraft(app.id, 'approve')}>
                             Approve
@@ -371,15 +361,14 @@ export default function ApproverApplicationList({ endpoint, pageTitle, emptyMess
                               />
                             </div>
                           )}
-                          <SignatureField
-                            label="Your signature (required)"
-                            hint="Sign below before confirming this action."
-                            required
-                            width={320}
-                            height={120}
-                            value={actionDraft.signature}
-                            onChange={(value) => setActionDraft((prev) => ({ ...prev, signature: value, error: '' }))}
-                          />
+                          {/* Signature is applied automatically from the approver's registered profile */}
+                          <div className="alert alert-success" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                            <span>✓</span>
+                            <span>Your registered signature will be applied automatically.</span>
+                            <Link to="/profile" style={{ marginLeft: 'auto', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                              Change
+                            </Link>
+                          </div>
                           <div className="dashboard-accordion-actions">
                             <Button
                               type="button"

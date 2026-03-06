@@ -13,7 +13,6 @@ import { usePagination } from '../hooks/usePagination';
 import Button from '../components/Button';
 import StatsRow from '../components/StatsRow';
 import PageHeader from '../components/PageHeader';
-import SignatureField from '../components/SignatureField';
 import StatusBadge from '../components/StatusBadge';
 import { formatLeaveEnd, formatLeaveRange, formatLeaveStart } from '../utils/leaveDateDisplay';
 
@@ -36,7 +35,6 @@ export default function Dashboard() {
     appId: null,
     action: null,
     comment: '',
-    signature: null,
     error: '',
   });
   const activeApplications = useMemo(
@@ -87,31 +85,15 @@ export default function Dashboard() {
   );
 
   const resetDraft = () => {
-    setActionDraft({
-      appId: null,
-      action: null,
-      comment: '',
-      signature: null,
-      error: '',
-    });
+    setActionDraft({ appId: null, action: null, comment: '', error: '' });
   };
 
   const openActionDraft = (appId, action) => {
-    setActionDraft({
-      appId,
-      action,
-      comment: '',
-      signature: null,
-      error: '',
-    });
+    setActionDraft({ appId, action, comment: '', error: '' });
   };
 
   const submitDecision = async () => {
     if (!actionDraft.appId || !actionDraft.action) return;
-    if (!actionDraft.signature) {
-      setActionDraft((prev) => ({ ...prev, error: 'Signature is required before submitting.' }));
-      return;
-    }
     if (actionDraft.action === 'disapprove' && !actionDraft.comment.trim()) {
       setActionDraft((prev) => ({ ...prev, error: 'Comment is mandatory for disapproval.' }));
       return;
@@ -125,7 +107,7 @@ export default function Dashboard() {
         body: JSON.stringify({
           action: actionDraft.action,
           comment: actionDraft.comment.trim() || undefined,
-          approver_signature_data: actionDraft.signature,
+          // approver_signature_data not sent — backend uses the approver's registered profile signature
         }),
       });
       resetDraft();
@@ -251,7 +233,14 @@ export default function Dashboard() {
                         <p><strong>Type:</strong> {app.leave_type}</p>
                       </div>
 
-                      {canApprove && !isDraftForItem && (
+                      {canApprove && !isDraftForItem && !user?.has_signature && (
+                        <div className="alert alert-warning" style={{ marginTop: '0.75rem' }}>
+                          <Link to="/profile"><strong>Register your signature in My Profile</strong></Link>
+                          {' '}to approve or disapprove applications.
+                        </div>
+                      )}
+
+                      {canApprove && !isDraftForItem && user?.has_signature && (
                         <div className="dashboard-accordion-actions">
                           <Button type="button" variant="primary" onClick={() => openActionDraft(app.id, 'approve')}>
                             Approve
@@ -275,15 +264,11 @@ export default function Dashboard() {
                               />
                             </div>
                           )}
-                          <SignatureField
-                            label="Your signature (required)"
-                            hint="Sign below before confirming this action."
-                            required
-                            width={320}
-                            height={120}
-                            value={actionDraft.signature}
-                            onChange={(value) => setActionDraft((prev) => ({ ...prev, signature: value, error: '' }))}
-                          />
+                          <div className="alert alert-success" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                            <span>✓</span>
+                            <span>Your registered signature will be applied automatically.</span>
+                            <Link to="/profile" style={{ marginLeft: 'auto', fontSize: '0.8rem' }}>Change</Link>
+                          </div>
                           <div className="dashboard-accordion-actions">
                             <Button
                               type="button"

@@ -14,13 +14,14 @@ export async function authRequired(req, res, next) {
     const { rows } = await pool.query(
       `SELECT u.id, u.full_name, u.username, u.email, u.division_id, u.reports_to_id,
               u.vnpf_no, u.post_title, u.post_no, u.grade, u.department, u.ministry, u.entry_date,
+              (u.signature_data IS NOT NULL AND u.signature_data <> '') AS has_signature,
               d.name as division_name,
               array_agg(ur.role_id) FILTER (WHERE ur.role_id IS NOT NULL) as role_ids
        FROM users u
        LEFT JOIN user_roles ur ON u.id = ur.user_id
        LEFT JOIN divisions d ON d.id = u.division_id
        WHERE u.id = $1
-       GROUP BY u.id, u.full_name, u.username, u.email, u.division_id, u.reports_to_id, u.vnpf_no, u.post_title, u.post_no, u.grade, u.department, u.ministry, u.entry_date, d.name`,
+       GROUP BY u.id, u.full_name, u.username, u.email, u.division_id, u.reports_to_id, u.vnpf_no, u.post_title, u.post_no, u.grade, u.department, u.ministry, u.entry_date, u.signature_data, d.name`,
       [decoded.userId]
     );
     if (!rows.length) {

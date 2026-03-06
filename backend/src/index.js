@@ -7,7 +7,8 @@ import leaveRoutes from './routes/leave.js';
 import usersRoutes from './routes/users.js';
 import delegationsRoutes from './routes/delegations.js';
 import overtimeRoutes from './routes/overtime.js';
-import leavePolicyRoutes from './routes/leavePolicyRoutes.js'; // Import new routes
+import profileRoutes from './routes/profile.js';
+import leavePolicyRoutes from './routes/leavePolicyRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -28,6 +29,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/leave', leaveRoutes);
 app.use('/api/overtime', overtimeRoutes);
+app.use('/api/profile', profileRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/delegations', delegationsRoutes);
 app.use('/api/admin/leave-policies', leavePolicyRoutes); // Mount new routes
@@ -84,11 +86,22 @@ app.use((err, req, res, next) => {
 });
 
 const HOST = process.env.HOST || '127.0.0.1';
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`VMGD Leave API running on http://${HOST}:${PORT}`);
   const hasDb = !!process.env.DATABASE_URL;
   const hasJwt = !!(process.env.JWT_SECRET && String(process.env.JWT_SECRET).trim());
   if (!hasDb) console.warn('WARN: DATABASE_URL is not set');
   if (!hasJwt) console.warn('WARN: JWT_SECRET is not set — login will fail');
   if (hasDb && hasJwt) console.log('Env OK: DATABASE_URL and JWT_SECRET set');
+});
+
+// Graceful error handling — prevents cryptic crash when port is already in use
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n ERROR: Port ${PORT} is already in use.`);
+    console.error(` Run: netstat -ano | findstr :${PORT}  — to find and kill the conflicting process.\n`);
+  } else {
+    console.error('Server error:', err);
+  }
+  process.exit(1);
 });

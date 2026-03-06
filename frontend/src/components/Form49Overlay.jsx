@@ -143,6 +143,7 @@ export default function Form49Overlay({ user, formData }) {
   const signatureData = normalizeSignatureData(formData?.signature_data);
   const transparentStaffSignatureData = useTransparentSignatureData(signatureData);
   const hasSignature = !!signatureData;
+  // For submitted applications use created_at; for live preview (no created_at) use today's date
   const staffsigdt = hasSignature ? formatDDMMMYYYY(formData?.created_at || new Date().toISOString().slice(0, 10)) : '';
 
   const supervisorSignatureData = normalizeSignatureData(formData?.manager_signature_data || formData?.pso_signature_data);

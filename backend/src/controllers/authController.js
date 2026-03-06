@@ -28,13 +28,14 @@ export async function login(req, res, next) {
     const { rows } = await pool.query(
       `SELECT u.id, u.username, u.email, u.password_hash, u.full_name, u.division_id, u.reports_to_id,
               u.vnpf_no, u.post_title, u.post_no, u.grade, u.department, u.ministry, u.entry_date,
+              (u.signature_data IS NOT NULL AND u.signature_data <> '') AS has_signature,
               d.name as division_name,
               array_agg(ur.role_id) FILTER (WHERE ur.role_id IS NOT NULL) as role_ids
        FROM users u
        LEFT JOIN user_roles ur ON u.id = ur.user_id
        LEFT JOIN divisions d ON d.id = u.division_id
        WHERE LOWER(u.email) = LOWER($1) OR LOWER(u.username) = LOWER($1)
-       GROUP BY u.id, u.full_name, u.username, u.email, u.division_id, u.reports_to_id, u.vnpf_no, u.post_title, u.post_no, u.grade, u.department, u.ministry, u.entry_date, d.name`,
+       GROUP BY u.id, u.full_name, u.username, u.email, u.division_id, u.reports_to_id, u.vnpf_no, u.post_title, u.post_no, u.grade, u.department, u.ministry, u.entry_date, u.signature_data, d.name`,
       [loginId]
     );
     const user = rows[0];
@@ -83,6 +84,7 @@ export async function login(req, res, next) {
         entry_date: formatEntryDateForApi(user.entry_date),
         division_name: user.division_name ?? '',
         role_ids: roleIds,
+        has_signature: user.has_signature === true,
       },
     });
   } catch (err) {
@@ -109,6 +111,7 @@ export async function me(req, res) {
     entry_date: formatEntryDateForApi(u.entry_date),
     division_name: u.division_name ?? '',
     role_ids: u.role_ids || [],
+    has_signature: u.has_signature === true,
   });
 }
 

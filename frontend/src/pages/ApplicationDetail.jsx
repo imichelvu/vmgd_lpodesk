@@ -4,11 +4,10 @@
  * Last updated: 2026-02-28
  */
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ROLE_IDS } from '../context/AuthContext';
 import { useApi } from '../hooks/useApi';
-import SignatureField from '../components/SignatureField';
 import Button from '../components/Button';
 import PageHeader from '../components/PageHeader';
 import StatusBadge from '../components/StatusBadge';
@@ -49,7 +48,6 @@ export default function ApplicationDetail() {
   const [actionLoading, setActionLoading] = useState(false);
   const [action, setAction] = useState(null);
   const [comment, setComment] = useState('');
-  const [approverSignature, setApproverSignature] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,7 +71,6 @@ export default function ApplicationDetail() {
   );
 
   const handleAction = async (act) => {
-    if (!approverSignature) return;
     setActionLoading(true);
     try {
       const res = await api(`/leave/${id}/approve`, {
@@ -82,7 +79,7 @@ export default function ApplicationDetail() {
         body: JSON.stringify({
           action: act,
           comment: comment.trim() || undefined,
-          approver_signature_data: approverSignature,
+          // approver_signature_data is not sent — backend uses the approver's registered profile signature
         }),
       });
       let data = {};
@@ -94,7 +91,6 @@ export default function ApplicationDetail() {
       if (!res.ok) throw new Error(data.detail || data.error || res.statusText || 'Approval failed');
       setAction(null);
       setComment('');
-      setApproverSignature(null);
       const newStatus = data.status || (act === 'disapprove' ? 'Disapproved' : null);
       if (newStatus && app) setApp((prev) => (prev ? { ...prev, status: newStatus } : null));
       const updated = await api(`/leave/${id}`).then((r) => r.json());
@@ -197,7 +193,13 @@ export default function ApplicationDetail() {
       {canApprove && (
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Approve / Disapprove</h3>
-          {action === null ? (
+          {!user?.has_signature ? (
+            <div className="alert alert-warning">
+              You must{' '}
+              <Link to="/profile"><strong>register your signature in My Profile</strong></Link>
+              {' '}before you can approve or disapprove this application.
+            </div>
+          ) : action === null ? (
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <Button type="button" variant="primary" onClick={() => setAction('approve')}>Approve</Button>
               <Button type="button" variant="danger" onClick={() => setAction('disapprove')}>Disapprove</Button>
@@ -210,22 +212,17 @@ export default function ApplicationDetail() {
                   <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} required />
                 </div>
               )}
-              <div>
-                <SignatureField
-                  label="Your signature (required)"
-                  hint="Sign below before confirming."
-                  required
-                  width={320}
-                  height={120}
-                  value={approverSignature}
-                  onChange={setApproverSignature}
-                />
+              {/* Signature is applied automatically from the approver's registered profile */}
+              <div className="alert alert-success" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                <span>✓</span>
+                <span>Your registered signature will be applied automatically.</span>
+                <Link to="/profile" style={{ marginLeft: 'auto', fontSize: '0.85rem' }}>Change</Link>
               </div>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <Button
                   type="button"
                   variant="primary"
-                  disabled={!approverSignature || (action === 'disapprove' && !comment.trim())}
+                  disabled={action === 'disapprove' && !comment.trim()}
                   loading={actionLoading}
                   loadingText="Processing..."
                   onClick={() => handleAction(action)}
@@ -235,7 +232,7 @@ export default function ApplicationDetail() {
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => { setAction(null); setComment(''); setApproverSignature(null); }}
+                  onClick={() => { setAction(null); setComment(''); }}
                 >
                   Cancel
                 </Button>

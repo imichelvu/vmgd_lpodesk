@@ -54,7 +54,18 @@ export default function NewApplication() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [overlayData, setOverlayData] = useState(null);
+  const [registeredSignature, setRegisteredSignature] = useState(null);
   const [destinationSuggestions, setDestinationSuggestions] = useState(() => readDestinationHistory());
+
+  // Fetch the user's registered signature once so the preview can display it
+  useEffect(() => {
+    let cancelled = false;
+    if (!user?.has_signature) return undefined;
+    request('/profile/signature/data')
+      .then((data) => { if (!cancelled) setRegisteredSignature(data?.signature_data || null); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [user?.has_signature, request]);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,7 +137,10 @@ export default function NewApplication() {
             className="apply-preview-title"
           />
         </div>
-        <Form49Preview user={user} formData={overlayData} />
+        <Form49Preview
+          user={user}
+          formData={overlayData ? { ...overlayData, signature_data: registeredSignature } : null}
+        />
       </aside>
     </div>
   );

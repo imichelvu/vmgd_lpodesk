@@ -30,11 +30,23 @@ export async function create(req, res) {
   const {
     leave_type, destination, start_date, end_date, is_half_day,
     half_day_time_start, half_day_time_end, total_working_days, advance_pay,
-    advance_pay_date, reason_or_remarks, signature_data
+    advance_pay_date, reason_or_remarks,
   } = req.body;
 
   if (!leave_type || !start_date || !end_date || total_working_days == null) {
     return res.status(400).json({ error: 'leave_type, start_date, end_date, total_working_days required' });
+  }
+
+  // Fetch the applicant's registered signature from their profile
+  const { rows: sigRows } = await pool.query(
+    'SELECT signature_data FROM users WHERE id = $1',
+    [userId]
+  );
+  const signature_data = sigRows[0]?.signature_data || null;
+  if (!signature_data) {
+    return res.status(400).json({
+      error: 'You must register your signature in My Profile before submitting a leave application.',
+    });
   }
 
   const requestedDays = toPositiveNumber(total_working_days);
@@ -516,16 +528,24 @@ export async function getById(req, res) {
 export async function approveOrDisapprove(req, res) {
   try {
     const { id } = req.params;
-    const { action, comment, approver_signature_data } = req.body;
+    const { action, comment } = req.body;
     const user = req.user;
 
     if (action === 'disapprove' && !(comment && comment.trim())) {
       return res.status(400).json({ error: 'Comment is mandatory when disapproving' });
     }
-    if (!(approver_signature_data && typeof approver_signature_data === 'string' && approver_signature_data.trim())) {
-      return res.status(400).json({ error: 'Approver signature is required before approving or disapproving' });
+
+    // Always use the approver's registered profile signature — no ad-hoc signing needed
+    const { rows: sigRows } = await pool.query(
+      'SELECT signature_data FROM users WHERE id = $1',
+      [user.id]
+    );
+    const signatureValue = sigRows[0]?.signature_data || null;
+    if (!signatureValue) {
+      return res.status(400).json({
+        error: 'You must register your signature in My Profile before approving or disapproving applications.',
+      });
     }
-    const signatureValue = approver_signature_data.trim();
 
     const { rows: apps } = await pool.query('SELECT * FROM leave_applications WHERE id = $1', [id]);
     const app = apps[0];
