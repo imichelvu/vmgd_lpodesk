@@ -165,6 +165,8 @@ CREATE TABLE IF NOT EXISTS overtime_entries (
   end_datetime TIMESTAMPTZ,
   work_date DATE NOT NULL,
   hours DECIMAL(5,2) NOT NULL CHECK (hours > 0 AND hours <= 24),
+  overtime_type VARCHAR(100) NOT NULL DEFAULT 'General Overtime'
+    CHECK (overtime_type IN ('Weekend / Field Work', 'Emergency Callout', 'Standby Duty', 'Overseas Mission', 'General Overtime')),
   purpose VARCHAR(30) NOT NULL
     CHECK (purpose IN ('Overtime Payment', 'Time Off In Lieu')),
   remarks TEXT,

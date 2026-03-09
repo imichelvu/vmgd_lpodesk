@@ -8,6 +8,18 @@ import pool from '../db/pool.js';
 const PURPOSE_OVERTIME_PAYMENT = 'Overtime Payment';
 const PURPOSE_TOIL = 'Time Off In Lieu';
 const ALLOWED_PURPOSES = new Set([PURPOSE_OVERTIME_PAYMENT, PURPOSE_TOIL]);
+
+// Nature-of-work categories for VMGD operations
+export const OVERTIME_TYPES = [
+  'Weekend / Field Work',   // worked on weekends during field trips
+  'Emergency Callout',      // called in for server, workstation, or power issues
+  'Standby Duty',           // standby during TL/TC or operational alert
+  'Overseas Mission',       // international travel, training, conferences, or meetings
+  'General Overtime',       // all other extra work
+];
+const ALLOWED_OVERTIME_TYPES = new Set(OVERTIME_TYPES);
+const DEFAULT_OVERTIME_TYPE = 'General Overtime';
+
 const HOURS_PER_WORKDAY = 8;
 let overtimeHasDateTimeColumns = null;
 
@@ -50,6 +62,13 @@ function getHoursFromDateTimeRange(startDate, endDate) {
   return Math.round(hours * 100) / 100;
 }
 
+function validateBreakHours(value) {
+  if (value === undefined || value === null || value === '') return 0;
+  const num = Number.parseFloat(value);
+  if (!Number.isFinite(num) || num < 0 || num >= 24) return null; // null = invalid
+  return Math.round(num * 100) / 100;
+}
+
 async function hasOvertimeDateTimeColumns() {
   if (typeof overtimeHasDateTimeColumns === 'boolean') return overtimeHasDateTimeColumns;
   const { rows } = await pool.query(
@@ -65,34 +84,45 @@ async function hasOvertimeDateTimeColumns() {
 
 export async function createOvertimeEntry(req, res) {
   const userId = req.user.id;
-  const { start_datetime, end_datetime, purpose, remarks } = req.body || {};
+  const { start_datetime, end_datetime, overtime_type, purpose, remarks, break_hours: rawBreak } = req.body || {};
   const startDateTime = validateDateTime(start_datetime);
   const endDateTime = validateDateTime(end_datetime);
   const rawPurpose = typeof purpose === 'string' ? purpose.trim() : '';
   const purposeValue = ALLOWED_PURPOSES.has(rawPurpose) ? rawPurpose : PURPOSE_OVERTIME_PAYMENT;
+  const rawType = typeof overtime_type === 'string' ? overtime_type.trim() : '';
+  const overtimeTypeValue = ALLOWED_OVERTIME_TYPES.has(rawType) ? rawType : DEFAULT_OVERTIME_TYPE;
   const remarksValue = remarks && String(remarks).trim() ? String(remarks).trim() : null;
 
   if (!startDateTime || !endDateTime) {
     return res.status(400).json({ error: 'Valid start_datetime and end_datetime are required.' });
   }
-  const hoursValue = getHoursFromDateTimeRange(startDateTime, endDateTime);
-  if (hoursValue == null) {
+  const elapsedHours = getHoursFromDateTimeRange(startDateTime, endDateTime);
+  if (elapsedHours == null) {
     return res.status(400).json({ error: 'end_datetime must be after start_datetime, with total hours <= 24.' });
   }
+  const breakHoursValue = validateBreakHours(rawBreak);
+  if (breakHoursValue === null) {
+    return res.status(400).json({ error: 'break_hours must be a number between 0 and 24.' });
+  }
+  const netHours = Math.round(Math.max(0, elapsedHours - breakHoursValue) * 100) / 100;
+  if (netHours <= 0) {
+    return res.status(400).json({ error: 'Net worked hours (elapsed minus break) must be greater than zero.' });
+  }
+
   const workDate = startDateTime.toISOString().slice(0, 10);
   const supportsDateTime = await hasOvertimeDateTimeColumns();
   const { rows } = supportsDateTime
     ? await pool.query(
-      `INSERT INTO overtime_entries (user_id, start_datetime, end_datetime, work_date, hours, purpose, remarks)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO overtime_entries (user_id, start_datetime, end_datetime, work_date, hours, break_hours, overtime_type, purpose, remarks)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
-      [userId, startDateTime.toISOString(), endDateTime.toISOString(), workDate, hoursValue, purposeValue, remarksValue]
+      [userId, startDateTime.toISOString(), endDateTime.toISOString(), workDate, netHours, breakHoursValue, overtimeTypeValue, purposeValue, remarksValue]
     )
     : await pool.query(
-      `INSERT INTO overtime_entries (user_id, work_date, hours, purpose, remarks)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO overtime_entries (user_id, work_date, hours, break_hours, overtime_type, purpose, remarks)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [userId, workDate, hoursValue, purposeValue, remarksValue]
+      [userId, workDate, netHours, breakHoursValue, overtimeTypeValue, purposeValue, remarksValue]
     );
   res.status(201).json(rows[0]);
 }
@@ -103,6 +133,7 @@ export async function listMyOvertimeEntries(req, res) {
   const fromDate = validateWorkDate(req.query.from_date);
   const toDate = validateWorkDate(req.query.to_date);
   const purpose = typeof req.query.purpose === 'string' ? req.query.purpose.trim() : '';
+  const overtimeType = typeof req.query.overtime_type === 'string' ? req.query.overtime_type.trim() : '';
   const supportsDateTime = await hasOvertimeDateTimeColumns();
 
   const conditions = ['user_id = $1'];
@@ -120,6 +151,10 @@ export async function listMyOvertimeEntries(req, res) {
   if (ALLOWED_PURPOSES.has(purpose)) {
     conditions.push(`purpose = $${i++}`);
     params.push(purpose);
+  }
+  if (ALLOWED_OVERTIME_TYPES.has(overtimeType)) {
+    conditions.push(`overtime_type = $${i++}`);
+    params.push(overtimeType);
   }
   const whereClause = `WHERE ${conditions.join(' AND ')}`;
 
@@ -216,9 +251,17 @@ export async function updateMyOvertimeEntry(req, res) {
     if (!startDateTime || !endDateTime) {
       return res.status(400).json({ error: 'Valid start_datetime and end_datetime are required.' });
     }
-    const hoursValue = getHoursFromDateTimeRange(startDateTime, endDateTime);
-    if (hoursValue == null) {
+    const elapsedHours = getHoursFromDateTimeRange(startDateTime, endDateTime);
+    if (elapsedHours == null) {
       return res.status(400).json({ error: 'end_datetime must be after start_datetime, with total hours <= 24.' });
+    }
+    const breakHoursValue = validateBreakHours(req.body.break_hours);
+    if (breakHoursValue === null) {
+      return res.status(400).json({ error: 'break_hours must be a number between 0 and 24.' });
+    }
+    const netHours = Math.round(Math.max(0, elapsedHours - breakHoursValue) * 100) / 100;
+    if (netHours <= 0) {
+      return res.status(400).json({ error: 'Net worked hours (elapsed minus break) must be greater than zero.' });
     }
     updates.push(`start_datetime = $${i++}`);
     params.push(startDateTime.toISOString());
@@ -226,13 +269,23 @@ export async function updateMyOvertimeEntry(req, res) {
     params.push(endDateTime.toISOString());
     updates.push(`work_date = $${i++}`);
     params.push(startDateTime.toISOString().slice(0, 10));
+    updates.push(`break_hours = $${i++}`);
+    params.push(breakHoursValue);
     updates.push(`hours = $${i++}`);
-    params.push(hoursValue);
+    params.push(netHours);
   } else if (req.body.hours !== undefined) {
     const hoursValue = validateHours(req.body.hours);
     if (hoursValue == null) return res.status(400).json({ error: 'Valid hours are required (0 < hours <= 24).' });
     updates.push(`hours = $${i++}`);
     params.push(hoursValue);
+  }
+  if (req.body.overtime_type !== undefined) {
+    const rawType = typeof req.body.overtime_type === 'string' ? req.body.overtime_type.trim() : '';
+    if (!ALLOWED_OVERTIME_TYPES.has(rawType)) {
+      return res.status(400).json({ error: `overtime_type must be one of: ${OVERTIME_TYPES.join(', ')}.` });
+    }
+    updates.push(`overtime_type = $${i++}`);
+    params.push(rawType);
   }
   if (req.body.purpose !== undefined) {
     const purpose = typeof req.body.purpose === 'string' ? req.body.purpose.trim() : '';
