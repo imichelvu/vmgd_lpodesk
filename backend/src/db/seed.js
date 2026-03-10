@@ -1,5 +1,5 @@
 import '../loadEnv.js';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import pool from './pool.js';
 
 const ROLES = { Staff: 1, PSO: 2, Manager: 3, Director: 4, Admin: 5 };
