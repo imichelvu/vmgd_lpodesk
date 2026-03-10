@@ -1,77 +1,52 @@
 /**
  * Author: Igor Michel
- * Purpose: Show a branded full-page/content loader using VMGD logo.
- * Last updated: 2026-02-28
+ * Purpose: Full-page / inline content loader — animated green sinusoid wave.
  */
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 
-const LOGO_SRC = '/vmgd-loader.png';
+// SVG sinusoid path: one full period across 200px wide × 40px tall viewBox
+const WAVE_PATH = 'M0,20 C16,0 34,0 50,20 C66,40 84,40 100,20 C116,0 134,0 150,20 C166,40 184,40 200,20';
 
-function useTransparentLogo(src) {
-  const [resolvedSrc, setResolvedSrc] = useState(src);
-
-  useEffect(() => {
-    let cancelled = false;
-    const img = new Image();
-
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth || img.width;
-        canvas.height = img.naturalHeight || img.height;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        if (!ctx) throw new Error('2d context unavailable');
-        ctx.drawImage(img, 0, 0);
-
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const pixels = imageData.data;
-
-        // Remove dark background around the logo to simulate transparency.
-        for (let i = 0; i < pixels.length; i += 4) {
-          const r = pixels[i];
-          const g = pixels[i + 1];
-          const b = pixels[i + 2];
-          const a = pixels[i + 3];
-          if (a === 0) continue;
-
-          if (r < 26 && g < 26 && b < 26) {
-            pixels[i + 3] = 0;
-          } else if (r < 40 && g < 40 && b < 40) {
-            pixels[i + 3] = Math.min(a, 35);
-          }
-        }
-
-        ctx.putImageData(imageData, 0, 0);
-        const cleaned = canvas.toDataURL('image/png');
-        if (!cancelled) setResolvedSrc(cleaned);
-      } catch (_) {
-        if (!cancelled) setResolvedSrc(src);
-      }
-    };
-
-    img.onerror = () => {
-      if (!cancelled) setResolvedSrc(src);
-    };
-
-    img.src = src;
-    return () => {
-      cancelled = true;
-    };
-  }, [src]);
-
-  return resolvedSrc;
-}
-
-export default function AppLoader({ message = 'Loading...', fullPage = true }) {
-  const logoSrc = useTransparentLogo(LOGO_SRC);
-
+export default function AppLoader({ message = 'Loading…', fullPage = true }) {
   return (
-    <div className={`app-loader ${fullPage ? 'app-loader-fullpage' : ''}`.trim()}>
+    <div className={`app-loader${fullPage ? ' app-loader-fullpage' : ''}`}>
       <div className="app-loader-content">
-        <img src={logoSrc} alt="VMGD logo" className="app-loader-logo" />
-        <p className="app-loader-text">{message}</p>
+        <svg
+          className="app-loader-wave"
+          viewBox="0 0 200 40"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          {/* Glow layer */}
+          <path
+            d={WAVE_PATH}
+            fill="none"
+            stroke="#22c55e"
+            strokeWidth="6"
+            strokeLinecap="round"
+            opacity="0.25"
+          />
+          {/* Bright travelling dot on the wave */}
+          <path
+            d={WAVE_PATH}
+            fill="none"
+            stroke="#16a34a"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeDasharray="200"
+            strokeDashoffset="200"
+            className="app-loader-wave-line"
+          />
+          <circle r="4" fill="#22c55e" className="app-loader-wave-dot">
+            <animateMotion
+              dur="1.4s"
+              repeatCount="indefinite"
+              path={WAVE_PATH}
+            />
+          </circle>
+        </svg>
+        {message && <p className="app-loader-text">{message}</p>}
       </div>
     </div>
   );
 }
-

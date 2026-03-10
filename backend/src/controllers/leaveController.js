@@ -118,6 +118,18 @@ export async function listBalances(req, res) {
   }
 }
 
+/** GET /api/leave/toil-balance — returns the current user's TOIL hours/days snapshot */
+export async function toilBalance(req, res) {
+  const { getTOILBalance } = await import('../services/leaveBalanceService.js');
+  const client = await pool.connect();
+  try {
+    const balance = await getTOILBalance(client, req.user.id);
+    res.json(balance);
+  } finally {
+    client.release();
+  }
+}
+
 export async function listMine(req, res) {
   const { rows } = await pool.query(
     `SELECT la.*, d.name as division_name

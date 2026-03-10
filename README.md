@@ -103,7 +103,7 @@ npm run dev:frontend
 ```
 
 - Frontend: `http://localhost:5173`
-- Backend API: `http://127.0.0.1:4000`
+- Backend API: `http://127.0.0.1:5000`
 
 ## Frontend environment
 
@@ -112,7 +112,7 @@ npm run dev:frontend
 Recommended local value:
 
 ```env
-VITE_API_URL=http://127.0.0.1:4000/api
+VITE_API_URL=http://127.0.0.1:5000/api
 VITE_APP_NAME=VMGD LeaveDesk
 ```
 
@@ -162,8 +162,8 @@ Notes:
 
 ## Troubleshooting
 
-- Backend health: `http://127.0.0.1:4000/api/health`
-- Backend diagnostics: `http://127.0.0.1:4000/api/troubleshoot`
+- Backend health: `http://127.0.0.1:5000/api/health`
+- Backend diagnostics: `http://127.0.0.1:5000/api/troubleshoot`
 - If login hangs:
   - Ensure backend is running on the configured host/port.
   - Verify frontend `VITE_API_URL` points to backend `/api`.

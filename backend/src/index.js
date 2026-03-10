@@ -9,6 +9,7 @@ import delegationsRoutes from './routes/delegations.js';
 import overtimeRoutes from './routes/overtime.js';
 import profileRoutes from './routes/profile.js';
 import leavePolicyRoutes from './routes/leavePolicyRoutes.js';
+import settingsRoutes from './routes/settings.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -32,7 +33,8 @@ app.use('/api/overtime', overtimeRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/delegations', delegationsRoutes);
-app.use('/api/admin/leave-policies', leavePolicyRoutes); // Mount new routes
+app.use('/api/admin/leave-policies', leavePolicyRoutes);
+app.use('/api/settings', settingsRoutes);
 
 app.get('/', (_, res) => {
   res.type('html').send(`
@@ -61,7 +63,7 @@ app.get('/api/troubleshoot', async (_, res) => {
     env: {
       DATABASE_URL_set: !!(process.env.DATABASE_URL && process.env.DATABASE_URL.trim()),
       JWT_SECRET_set: !!(process.env.JWT_SECRET && String(process.env.JWT_SECRET).trim()),
-      PORT: process.env.PORT || 4000,
+      PORT: process.env.PORT || 5000,
     },
     database: { connected: false, error: null },
   };

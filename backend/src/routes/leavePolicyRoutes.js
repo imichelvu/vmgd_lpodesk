@@ -1,3 +1,8 @@
+/**
+ * Author: Igor Michel
+ * Purpose: Admin routes for leave_balance_policies and leave_accrual_tiers CRUD.
+ * PK for policies: leave_type (URL-encoded). Tiers PK: (leave_type, min_years).
+ */
 import { Router } from 'express';
 import {
   listLeavePolicies,
@@ -15,18 +20,18 @@ import { checkRole, ROLE_IDS } from '../middleware/checkRole.js';
 const router = Router();
 
 router.use(authRequired);
-router.use(checkRole(ROLE_IDS.Admin)); // Only Admin can manage policies
+router.use(checkRole(ROLE_IDS.Admin));
 
-// Leave Policy Routes
-router.get('/', listLeavePolicies);
-router.post('/', createLeavePolicy);
-router.patch('/:id', updateLeavePolicy);
-router.delete('/:id', deleteLeavePolicy);
+// Policies — keyed by leave_type (text, URL-encoded in path)
+router.get('/',                             listLeavePolicies);
+router.post('/',                            createLeavePolicy);
+router.patch('/:leaveType',                 updateLeavePolicy);
+router.delete('/:leaveType',               deleteLeavePolicy);
 
-// Accrual Tier Routes
-router.get('/:policyId/tiers', listAccrualTiers);
-router.post('/:policyId/tiers', createAccrualTier);
-router.patch('/:policyId/tiers/:tierId', updateAccrualTier);
-router.delete('/:policyId/tiers/:tierId', deleteAccrualTier);
+// Accrual tiers — keyed by (leave_type, min_years)
+router.get('/:leaveType/tiers',            listAccrualTiers);
+router.post('/:leaveType/tiers',           createAccrualTier);
+router.patch('/:leaveType/tiers/:minYears', updateAccrualTier);
+router.delete('/:leaveType/tiers/:minYears', deleteAccrualTier);
 
 export default router;

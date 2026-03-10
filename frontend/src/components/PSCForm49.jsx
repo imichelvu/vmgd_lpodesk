@@ -12,6 +12,7 @@ const LEAVE_TYPES = [
   'Family',
   'Compassionate',
   'Sporting / Cultural / Religious',
+  'Time Off In Lieu',
   'Leave without pay',
   'Other',
 ];
@@ -24,6 +25,7 @@ export default function PSCForm49({
   initialValues,
   onFormChange,
   destinationSuggestions = [],
+  toilBalance = null,   // { available_hours, available_days, earned_hours, used_hours, multiplier, expiry_months }
 }) {
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const { user } = useAuth();
@@ -164,9 +166,36 @@ export default function PSCForm49({
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
-          {leave_type === 'Annual vacation' ? (
+          {leave_type === 'Annual vacation' && (
             <span className="form-hint">Annual leave requests must be submitted at least 14 days before start date.</span>
-          ) : null}
+          )}
+          {leave_type === 'Time Off In Lieu' && toilBalance && (
+            <div style={{
+              marginTop: '0.5rem',
+              padding: '10px 14px',
+              borderRadius: 8,
+              background: toilBalance.available_hours > 0 ? 'var(--surface-raised)' : '#fef3c7',
+              border: `1px solid ${toilBalance.available_hours > 0 ? 'var(--border)' : '#fde68a'}`,
+              fontSize: '0.87rem',
+            }}>
+              <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+                <span><strong>{toilBalance.available_hours.toFixed(1)} h</strong> <span className="text-muted">available</span></span>
+                <span><strong>≈ {toilBalance.available_days.toFixed(2)} days</strong></span>
+                <span className="text-muted">Earned: {toilBalance.earned_hours.toFixed(1)} h · Used: {toilBalance.used_hours.toFixed(1)} h</span>
+              </div>
+              <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                Rate: {toilBalance.multiplier}× · Expires within {toilBalance.expiry_months} month(s) of each overtime entry date (PSSRM s.4.1(b))
+              </p>
+              {toilBalance.available_hours <= 0 && (
+                <p style={{ margin: '6px 0 0', color: '#b45309', fontWeight: 600, fontSize: '0.83rem' }}>
+                  ⚠ No TOIL balance available. Record overtime hours in the Overtime page first.
+                </p>
+              )}
+            </div>
+          )}
+          {leave_type === 'Time Off In Lieu' && !toilBalance && (
+            <span className="form-hint">Loading TOIL balance…</span>
+          )}
         </div>
         <div className="form-group">
           <label htmlFor="destination">Destination</label>

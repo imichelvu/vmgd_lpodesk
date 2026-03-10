@@ -66,6 +66,11 @@ async function calculateAnnualVacationAllocation(client, userId, year) {
 }
 
 export async function getBalanceSnapshot(client, userId, leaveType, year, { lock = false } = {}) {
+  // TOIL balance is derived from overtime entries — not stored in leave_balances
+  if (leaveType === TOIL_LEAVE_TYPE) {
+    return getTOILBalance(client, userId);
+  }
+
   const { rows: policyRows } = await client.query(
     `SELECT leave_type, default_allocation_days, requires_balance, allow_negative, min_notice_days
      FROM leave_balance_policies
@@ -110,26 +115,33 @@ export async function getBalanceSnapshot(client, userId, leaveType, year, { lock
 
 export async function getBalanceListForUser(client, userId, year) {
   const { rows: policyRows } = await client.query(
-    `SELECT leave_type
-     FROM leave_balance_policies
-     ORDER BY leave_type`
+    `SELECT leave_type FROM leave_balance_policies ORDER BY leave_type`
   );
 
   const items = [];
   for (const policy of policyRows) {
     const balance = await getBalanceSnapshot(client, userId, policy.leave_type, year);
     if (!balance) continue;
-    items.push({
-      leave_type: balance.leave_type,
-      requires_balance: balance.requires_balance,
-      allow_negative: balance.allow_negative,
-      min_notice_days: balance.min_notice_days,
-      default_allocation_days: balance.default_allocation_days,
-      allocated_days: balance.allocated_days,
-      carry_forward_days: balance.carry_forward_days,
-      used_days: balance.used_days,
-      available_days: balance.available_days,
-    });
+    const item = {
+      leave_type:             balance.leave_type,
+      requires_balance:       balance.requires_balance,
+      allow_negative:         balance.allow_negative,
+      min_notice_days:        balance.min_notice_days,
+      default_allocation_days: balance.default_allocation_days ?? 0,
+      allocated_days:         balance.allocated_days,
+      carry_forward_days:     balance.carry_forward_days,
+      used_days:              balance.used_days,
+      available_days:         balance.available_days,
+    };
+    // Attach TOIL-specific fields for the dashboard/form to display
+    if (balance.leave_type === TOIL_LEAVE_TYPE) {
+      item.available_hours = balance.available_hours;
+      item.earned_hours    = balance.earned_hours;
+      item.used_hours      = balance.used_hours;
+      item.multiplier      = balance.multiplier;
+      item.expiry_months   = balance.expiry_months;
+    }
+    items.push(item);
   }
   return items;
 }
@@ -141,6 +153,71 @@ export function assertSufficientBalance(balance, requestedDays, leaveType) {
   if (Number(balance.available_days) >= requestedDays) return;
   const available = Math.max(0, Number(balance.available_days) || 0).toFixed(1);
   throw new Error(`Insufficient ${leaveType} balance. Available: ${available} day(s).`);
+}
+
+const TOIL_LEAVE_TYPE = 'Time Off In Lieu';
+const HOURS_PER_WORKDAY = 8;
+
+/** Read a numeric setting from app_settings, falling back to defaultVal if missing. */
+async function readSetting(client, key, defaultVal) {
+  try {
+    const { rows } = await client.query(`SELECT value FROM app_settings WHERE key = $1`, [key]);
+    const num = Number(rows[0]?.value);
+    return Number.isFinite(num) && num > 0 ? num : defaultVal;
+  } catch {
+    return defaultVal;
+  }
+}
+
+/**
+ * Compute TOIL balance for a user.
+ * Earned = SUM(overtime net hours within expiry window) × multiplier
+ * Used   = SUM(total_working_days × 8h) for Approved/Pending TOIL leave applications
+ * Available (hours) = Earned − Used
+ * Available (days)  = Available hours ÷ 8
+ */
+export async function getTOILBalance(client, userId) {
+  const multiplier   = await readSetting(client, 'toil_multiplier',    1.25);
+  const expiryMonths = await readSetting(client, 'toil_expiry_months', 3);
+
+  const { rows: earnedRows } = await client.query(
+    `SELECT COALESCE(SUM(hours), 0)::numeric(10,2) AS net_hours
+     FROM overtime_entries
+     WHERE user_id = $1
+       AND created_at >= NOW() - ($2 || ' months')::INTERVAL`,
+    [userId, String(expiryMonths)]
+  );
+  const earnedHours = Number(earnedRows[0]?.net_hours || 0) * multiplier;
+
+  const { rows: usedRows } = await client.query(
+    `SELECT COALESCE(SUM(total_working_days * $2), 0)::numeric(10,2) AS used_hours
+     FROM leave_applications
+     WHERE applicant_id = $1
+       AND leave_type = $3
+       AND status IN ('Pending_PSO', 'Pending_Manager', 'Pending_Director', 'Approved')`,
+    [userId, HOURS_PER_WORKDAY, TOIL_LEAVE_TYPE]
+  );
+  const usedHours = Number(usedRows[0]?.used_hours || 0);
+
+  const availableHours = Math.max(0, Math.round((earnedHours - usedHours) * 100) / 100);
+  const availableDays  = Math.round((availableHours / HOURS_PER_WORKDAY) * 100) / 100;
+
+  return {
+    leave_type:       TOIL_LEAVE_TYPE,
+    multiplier,
+    expiry_months:    expiryMonths,
+    earned_hours:     Math.round(earnedHours * 100) / 100,
+    used_hours:       usedHours,
+    available_hours:  availableHours,
+    available_days:   availableDays,
+    requires_balance: true,
+    allow_negative:   false,
+    min_notice_days:  0,
+    // fields expected by assertSufficientBalance / display
+    allocated_days:   availableDays,
+    carry_forward_days: 0,
+    used_days:        Math.round((usedHours / HOURS_PER_WORKDAY) * 100) / 100,
+  };
 }
 
 export function assertAdvanceNotice(balance, startDate, leaveType) {

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   create,
   listBalances,
+  toilBalance,
   listMine,
   listMineHistory,
   listForSupervisor,
@@ -23,6 +24,7 @@ router.use(authRequired);
 
 router.post('/', create);
 router.get('/balances', listBalances);
+router.get('/toil-balance', toilBalance);
 router.get('/mine', listMine);
 router.get('/mine/history', listMineHistory);
 router.get('/supervisor', checkRole([ROLE_IDS.PSO, ROLE_IDS.Manager]), listForSupervisor);

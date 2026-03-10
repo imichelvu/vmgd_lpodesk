@@ -13,7 +13,8 @@ import UsersPagination from '../components/admin/UsersPagination';
 import UserFormModal from '../components/admin/UserFormModal';
 import DelegationManagement from '../components/admin/DelegationManagement';
 import UserBalanceManagement from '../components/admin/UserBalanceManagement';
-import LeavePolicyManagement from '../components/admin/LeavePolicyManagement'; // Import new component
+import LeavePolicyManagement from '../components/admin/LeavePolicyManagement';
+import AppSettingsPanel from '../components/admin/AppSettingsPanel';
 
 const emptyUserForm = (defaultRoleId) => ({
   full_name: '',
@@ -376,29 +377,9 @@ export default function AdminView() {
   return (
     <>
       <PageHeader
-        title="Admin"
-        subtitle="Manage users, roles, and acting supervisors."
+        title="Settings"
+        subtitle="Oversee users, roles, divisions, leave balances, policies, delegations, and TOIL rules for all system administration."
       />
-
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <h3 style={{ marginTop: 0 }}>Pending leave notifications</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-          Send (or resend) approval emails for all leave applications still pending PSO, Manager, or Director. Use this if emails were not sent when applications were submitted.
-        </p>
-        <Button type="button" variant="secondary" onClick={handleResendPendingEmails} loading={resendLoading} loadingText="Sending…">
-          Send emails for pending approvals
-        </Button>
-        {resendResult && (
-          <div style={{ marginTop: '1rem', padding: '0.75rem', background: 'var(--bg)', borderRadius: 6 }}>
-            <p style={{ margin: 0, fontWeight: 600 }}>{resendResult.message}</p>
-            {resendResult.details?.length > 0 && (
-              <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                {resendResult.details.map((line, i) => <li key={i}>{line}</li>)}
-              </ul>
-            )}
-          </div>
-        )}
-      </div>
 
       <div className="tabs">
         <button type="button" className={`tab ${tab === 'users' ? 'active' : ''}`} onClick={() => setTab('users')}>
@@ -412,6 +393,12 @@ export default function AdminView() {
         </button>
         <button type="button" className={`tab ${tab === 'leavePolicies' ? 'active' : ''}`} onClick={() => setTab('leavePolicies')}>
           Leave Policies
+        </button>
+        <button type="button" className={`tab ${tab === 'toilRules' ? 'active' : ''}`} onClick={() => setTab('toilRules')}>
+          TOIL Rules
+        </button>
+        <button type="button" className={`tab ${tab === 'notifications' ? 'active' : ''}`} onClick={() => setTab('notifications')}>
+          Notifications
         </button>
       </div>
 
@@ -674,6 +661,39 @@ export default function AdminView() {
         <LeavePolicyManagement
           onError={setError}
         />
+      )}
+
+      {tab === 'toilRules' && (
+        <AppSettingsPanel onError={setError} />
+      )}
+
+      {tab === 'notifications' && (
+        <div className="card">
+          <h2 className="card-title">Pending leave notifications</h2>
+          <p className="card-subtitle" style={{ marginTop: '0.25rem', marginBottom: '1rem' }}>
+            Send (or resend) approval emails for all leave applications still waiting on PSO, Manager, or Director.
+            Use this if emails were missed when applications were originally submitted.
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleResendPendingEmails}
+            loading={resendLoading}
+            loadingText="Sending…"
+          >
+            Send emails for pending approvals
+          </Button>
+          {resendResult && (
+            <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: 'var(--bg-subtle)', borderRadius: 8, border: '1px solid var(--border)' }}>
+              <p style={{ margin: 0, fontWeight: 600 }}>{resendResult.message}</p>
+              {resendResult.details?.length > 0 && (
+                <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                  {resendResult.details.map((line, i) => <li key={i}>{line}</li>)}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
       )}
     </>
   );

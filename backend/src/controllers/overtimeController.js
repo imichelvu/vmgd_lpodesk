@@ -43,7 +43,7 @@ function validateWorkDate(value) {
 function validateHours(value) {
   const num = Number.parseFloat(value);
   if (!Number.isFinite(num)) return null;
-  if (num <= 0 || num > 24) return null;
+  if (num <= 0 || num > MAX_ENTRY_HOURS) return null;
   return Math.round(num * 100) / 100;
 }
 
@@ -54,11 +54,14 @@ function validateDateTime(value) {
   return date;
 }
 
+// PSSRM allows multi-day entries (e.g. Overseas Mission). Cap at 31 days to catch typos.
+const MAX_ENTRY_HOURS = 31 * 24; // 744 hours
+
 function getHoursFromDateTimeRange(startDate, endDate) {
   const diffMs = endDate.getTime() - startDate.getTime();
   if (diffMs <= 0) return null;
   const hours = diffMs / (1000 * 60 * 60);
-  if (!Number.isFinite(hours) || hours <= 0 || hours > 24) return null;
+  if (!Number.isFinite(hours) || hours <= 0 || hours > MAX_ENTRY_HOURS) return null;
   return Math.round(hours * 100) / 100;
 }
 
@@ -84,7 +87,7 @@ async function hasOvertimeDateTimeColumns() {
 
 export async function createOvertimeEntry(req, res) {
   const userId = req.user.id;
-  const { start_datetime, end_datetime, overtime_type, purpose, remarks, break_hours: rawBreak } = req.body || {};
+  const { start_datetime, end_datetime, overtime_type, purpose, remarks, break_hours: rawBreak, location } = req.body || {};
   const startDateTime = validateDateTime(start_datetime);
   const endDateTime = validateDateTime(end_datetime);
   const rawPurpose = typeof purpose === 'string' ? purpose.trim() : '';
@@ -92,37 +95,41 @@ export async function createOvertimeEntry(req, res) {
   const rawType = typeof overtime_type === 'string' ? overtime_type.trim() : '';
   const overtimeTypeValue = ALLOWED_OVERTIME_TYPES.has(rawType) ? rawType : DEFAULT_OVERTIME_TYPE;
   const remarksValue = remarks && String(remarks).trim() ? String(remarks).trim() : null;
+  const locationValue = location && String(location).trim() ? String(location).trim() : null;
 
   if (!startDateTime || !endDateTime) {
     return res.status(400).json({ error: 'Valid start_datetime and end_datetime are required.' });
   }
   const elapsedHours = getHoursFromDateTimeRange(startDateTime, endDateTime);
   if (elapsedHours == null) {
-    return res.status(400).json({ error: 'end_datetime must be after start_datetime, with total hours <= 24.' });
+    return res.status(400).json({ error: 'end_datetime must be after start_datetime (max 31 days per entry).' });
   }
   const breakHoursValue = validateBreakHours(rawBreak);
   if (breakHoursValue === null) {
     return res.status(400).json({ error: 'break_hours must be a number between 0 and 24.' });
   }
   const netHours = Math.round(Math.max(0, elapsedHours - breakHoursValue) * 100) / 100;
-  if (netHours <= 0) {
-    return res.status(400).json({ error: 'Net worked hours (elapsed minus break) must be greater than zero.' });
+  // PSSRM s.4.1(e): minimum 1 hour above standard working hours per day to qualify for overtime/TOIL
+  if (netHours < 1) {
+    return res.status(400).json({
+      error: 'Net worked hours must be at least 1 hour to qualify for overtime or TOIL under PSSRM s.4.1(e).',
+    });
   }
 
   const workDate = startDateTime.toISOString().slice(0, 10);
   const supportsDateTime = await hasOvertimeDateTimeColumns();
   const { rows } = supportsDateTime
     ? await pool.query(
-      `INSERT INTO overtime_entries (user_id, start_datetime, end_datetime, work_date, hours, break_hours, overtime_type, purpose, remarks)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO overtime_entries (user_id, start_datetime, end_datetime, work_date, hours, break_hours, overtime_type, purpose, location, remarks)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
-      [userId, startDateTime.toISOString(), endDateTime.toISOString(), workDate, netHours, breakHoursValue, overtimeTypeValue, purposeValue, remarksValue]
+      [userId, startDateTime.toISOString(), endDateTime.toISOString(), workDate, netHours, breakHoursValue, overtimeTypeValue, purposeValue, locationValue, remarksValue]
     )
     : await pool.query(
-      `INSERT INTO overtime_entries (user_id, work_date, hours, break_hours, overtime_type, purpose, remarks)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO overtime_entries (user_id, work_date, hours, break_hours, overtime_type, purpose, location, remarks)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [userId, workDate, netHours, breakHoursValue, overtimeTypeValue, purposeValue, remarksValue]
+      [userId, workDate, netHours, breakHoursValue, overtimeTypeValue, purposeValue, locationValue, remarksValue]
     );
   res.status(201).json(rows[0]);
 }
@@ -204,23 +211,22 @@ export async function getMyOvertimeSummary(req, res) {
 
   const { rows } = await pool.query(
     `SELECT
-       COALESCE(SUM(hours), 0)::numeric(10,2) AS total_hours,
-       COALESCE(SUM(CASE WHEN purpose = $${i++} THEN hours ELSE 0 END), 0)::numeric(10,2) AS overtime_payment_hours,
-       COALESCE(SUM(CASE WHEN purpose = $${i++} THEN hours ELSE 0 END), 0)::numeric(10,2) AS toil_hours
+       COALESCE(SUM(hours), 0)::numeric(10,2) AS total_hours
      FROM overtime_entries
      ${whereClause}`,
-    [...params, PURPOSE_OVERTIME_PAYMENT, PURPOSE_TOIL]
+    params
   );
 
   const totalHours = Number(rows[0]?.total_hours || 0);
-  const overtimePaymentHours = Number(rows[0]?.overtime_payment_hours || 0);
-  const toilHours = Number(rows[0]?.toil_hours || 0);
+  // PSSRM s.4.1(b)/(c): all eligible overtime accrues TOIL at 1¼ hours per hour worked
+  const TOIL_MULTIPLIER = 1.25;
+  const toilAdjustedHours = Math.round(totalHours * TOIL_MULTIPLIER * 100) / 100;
 
   res.json({
     total_hours: totalHours,
-    overtime_payment_hours: overtimePaymentHours,
-    toil_hours: toilHours,
-    toil_days_equivalent: Number((toilHours / HOURS_PER_WORKDAY).toFixed(2)),
+    toil_adjusted_hours: toilAdjustedHours,
+    toil_days_equivalent: Number((toilAdjustedHours / HOURS_PER_WORKDAY).toFixed(2)),
+    toil_multiplier: TOIL_MULTIPLIER,
     hours_per_workday: HOURS_PER_WORKDAY,
   });
 }
@@ -260,8 +266,10 @@ export async function updateMyOvertimeEntry(req, res) {
       return res.status(400).json({ error: 'break_hours must be a number between 0 and 24.' });
     }
     const netHours = Math.round(Math.max(0, elapsedHours - breakHoursValue) * 100) / 100;
-    if (netHours <= 0) {
-      return res.status(400).json({ error: 'Net worked hours (elapsed minus break) must be greater than zero.' });
+    if (netHours < 1) {
+      return res.status(400).json({
+        error: 'Net worked hours must be at least 1 hour to qualify for overtime or TOIL under PSSRM s.4.1(e).',
+      });
     }
     updates.push(`start_datetime = $${i++}`);
     params.push(startDateTime.toISOString());
@@ -294,6 +302,11 @@ export async function updateMyOvertimeEntry(req, res) {
     }
     updates.push(`purpose = $${i++}`);
     params.push(purpose);
+  }
+  if (req.body.location !== undefined) {
+    const locationValue = req.body.location && String(req.body.location).trim() ? String(req.body.location).trim() : null;
+    updates.push(`location = $${i++}`);
+    params.push(locationValue);
   }
   if (req.body.remarks !== undefined) {
     const remarksValue = req.body.remarks && String(req.body.remarks).trim() ? String(req.body.remarks).trim() : null;

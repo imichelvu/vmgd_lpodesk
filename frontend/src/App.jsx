@@ -66,7 +66,7 @@ export default function App() {
           }
         />
         <Route
-          path="admin"
+          path="settings"
           element={
             <PrivateRoute allowedRoleIds={[ROLE_IDS.Admin]}>
               <AdminView />

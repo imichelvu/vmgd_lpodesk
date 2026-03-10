@@ -5,6 +5,15 @@ import StatsRow from '../components/StatsRow';
 import Modal from '../components/Modal';
 import { useApi } from '../hooks/useApi';
 
+// Context-sensitive location placeholder per overtime type
+const LOCATION_PLACEHOLDER = {
+  'Weekend / Field Work':  'e.g. Tanna AWS station, Efate weather post',
+  'Emergency Callout':     'e.g. Server room, VMGD HQ, Port Vila',
+  'Standby Duty':          'e.g. VMGD HQ or home (on-call)',
+  'Overseas Mission':      'e.g. Melbourne, Australia — WMO training',
+  'General Overtime':      'e.g. VMGD office, Port Vila',
+};
+
 // Nature-of-work categories — mirrors backend OVERTIME_TYPES
 const OVERTIME_TYPES = [
   { value: 'Weekend / Field Work',  label: 'Weekend / Field Work',  hint: 'Worked on weekends or during field trips' },
@@ -15,10 +24,13 @@ const OVERTIME_TYPES = [
 ];
 
 const INITIAL_FORM = {
-  start_datetime: '',
-  end_datetime: '',
+  start_date: '',
+  start_time: '',
+  end_date: '',
+  end_time: '',
   overtime_type: 'General Overtime',
   break_hours: '',
+  location: '',
   remarks: '',
 };
 
@@ -57,6 +69,24 @@ function getComputedHours(start, end) {
   return Math.round((diff / (1000 * 60 * 60)) * 100) / 100;
 }
 
+// PSSRM s.4.1 Unsocial Hours: 08:00–17:00 Saturdays, Sundays, and Official Public Holidays.
+// Weekday evenings are NOT unsocial hours under Vanuatu PSSRM.
+function detectUnsocialHours(start, end) {
+  if (!start || !end) return false;
+  const s = new Date(start);
+  const e = new Date(end);
+  if (!Number.isFinite(s.getTime()) || !Number.isFinite(e.getTime()) || e <= s) return false;
+  // Walk through each day in the range and check if any portion is on a weekend
+  const cursor = new Date(s);
+  cursor.setHours(0, 0, 0, 0);
+  while (cursor <= e) {
+    const dow = cursor.getDay(); // 0 = Sunday, 6 = Saturday
+    if (dow === 0 || dow === 6) return true;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return false;
+}
+
 export default function Overtime() {
   const { request } = useApi();
   const [form, setForm] = useState(INITIAL_FORM);
@@ -74,8 +104,7 @@ export default function Overtime() {
 
   const [summary, setSummary] = useState({
     total_hours: 0,
-    overtime_payment_hours: 0,
-    toil_hours: 0,
+    toil_adjusted_hours: 0,
     toil_days_equivalent: 0,
   });
 
@@ -83,9 +112,13 @@ export default function Overtime() {
   const [typeFilter, setTypeFilter] = useState('');
   const [fromDateFilter, setFromDateFilter] = useState('');
   const [toDateFilter, setToDateFilter] = useState('');
+  // Combine separate date + time fields into ISO datetime strings for calculation
+  const startDatetime = form.start_date && form.start_time ? `${form.start_date}T${form.start_time}` : '';
+  const endDatetime   = form.end_date   && form.end_time   ? `${form.end_date}T${form.end_time}`     : '';
+
   const elapsedHours = useMemo(
-    () => getComputedHours(form.start_datetime, form.end_datetime),
-    [form.start_datetime, form.end_datetime]
+    () => getComputedHours(startDatetime, endDatetime),
+    [startDatetime, endDatetime]
   );
   const breakHoursNum = useMemo(() => {
     const n = parseFloat(form.break_hours);
@@ -94,6 +127,13 @@ export default function Overtime() {
   const netHours = useMemo(
     () => Math.max(0, Math.round((elapsedHours - breakHoursNum) * 100) / 100),
     [elapsedHours, breakHoursNum]
+  );
+  // PSSRM s.4.1(e): min 1 hour net to qualify
+  const belowMinimum = netHours > 0 && netHours < 1;
+  // PSSRM s.4.1 Unsocial Hours: entry spans a Saturday or Sunday
+  const isUnsocialHours = useMemo(
+    () => detectUnsocialHours(startDatetime, endDatetime),
+    [startDatetime, endDatetime]
   );
 
   const loadEntries = useCallback(async (
@@ -135,15 +175,13 @@ export default function Overtime() {
       const data = await request(`/overtime/mine/summary${suffix}`);
       setSummary({
         total_hours: Number(data?.total_hours || 0),
-        overtime_payment_hours: Number(data?.overtime_payment_hours || 0),
-        toil_hours: Number(data?.toil_hours || 0),
+        toil_adjusted_hours: Number(data?.toil_adjusted_hours || 0),
         toil_days_equivalent: Number(data?.toil_days_equivalent || 0),
       });
     } catch {
       setSummary({
         total_hours: 0,
-        overtime_payment_hours: 0,
-        toil_hours: 0,
+        toil_adjusted_hours: 0,
         toil_days_equivalent: 0,
       });
     }
@@ -162,9 +200,10 @@ export default function Overtime() {
     return () => clearTimeout(focusTimer);
   }, [entryModalOpen]);
 
+  // PSSRM s.4.1(b)/(c): TOIL = net hours × 1.25
   const stats = useMemo(() => ([
-    { label: 'Total extra hours', value: summary.total_hours.toFixed(1), tone: 'default' },
-    { label: 'TOIL hours', value: summary.toil_hours.toFixed(1), tone: 'success' },
+    { label: 'Net extra hours', value: summary.total_hours.toFixed(1), tone: 'default', hint: 'After break deductions' },
+    { label: 'TOIL entitlement (×1.25)', value: summary.toil_adjusted_hours.toFixed(1), tone: 'success', hint: 'PSSRM s.4.1(b)/(c)' },
     { label: 'TOIL day equivalent', value: summary.toil_days_equivalent.toFixed(2), tone: 'default', hint: 'Based on 8h workday' },
   ]), [summary]);
 
@@ -177,10 +216,11 @@ export default function Overtime() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          start_datetime: form.start_datetime,
-          end_datetime: form.end_datetime,
+          start_datetime: startDatetime,
+          end_datetime: endDatetime,
           overtime_type: form.overtime_type,
           break_hours: breakHoursNum,
+          location: form.location,
           remarks: form.remarks,
         }),
       });
@@ -246,26 +286,47 @@ export default function Overtime() {
       >
         {submitError ? <div className="alert alert-danger">{submitError}</div> : null}
         <form onSubmit={handleCreate}>
-          <div className="form-row form-row-2">
-            <div className="form-group">
-              <label htmlFor="ot-start-datetime">Start date & time</label>
+          {/* Start — date and time in separate inputs for clarity */}
+          <div className="form-group">
+            <label>Start date & time <span style={{ color: 'var(--danger)' }}>*</span></label>
+            <div className="form-row form-row-2" style={{ marginBottom: 0 }}>
               <input
-                id="ot-start-datetime"
-                type="datetime-local"
+                id="ot-start-date"
+                type="date"
                 ref={startDateTimeInputRef}
-                value={form.start_datetime}
-                onChange={(e) => setForm((prev) => ({ ...prev, start_datetime: e.target.value }))}
+                value={form.start_date}
+                onChange={(e) => setForm((prev) => ({ ...prev, start_date: e.target.value }))}
                 required
               />
-            </div>
-            <div className="form-group">
-              <label htmlFor="ot-end-datetime">End date & time</label>
               <input
-                id="ot-end-datetime"
-                type="datetime-local"
-                value={form.end_datetime}
-                onChange={(e) => setForm((prev) => ({ ...prev, end_datetime: e.target.value }))}
+                id="ot-start-time"
+                type="time"
+                value={form.start_time}
+                onChange={(e) => setForm((prev) => ({ ...prev, start_time: e.target.value }))}
                 required
+                step="300"
+              />
+            </div>
+          </div>
+
+          {/* End — date and time in separate inputs for clarity */}
+          <div className="form-group">
+            <label>End date & time <span style={{ color: 'var(--danger)' }}>*</span></label>
+            <div className="form-row form-row-2" style={{ marginBottom: 0 }}>
+              <input
+                id="ot-end-date"
+                type="date"
+                value={form.end_date}
+                onChange={(e) => setForm((prev) => ({ ...prev, end_date: e.target.value }))}
+                required
+              />
+              <input
+                id="ot-end-time"
+                type="time"
+                value={form.end_time}
+                onChange={(e) => setForm((prev) => ({ ...prev, end_time: e.target.value }))}
+                required
+                step="300"
               />
             </div>
           </div>
@@ -273,7 +334,7 @@ export default function Overtime() {
           {elapsedHours > 0 && (
             <div style={{
               background: 'var(--surface-raised)',
-              border: '1px solid var(--border)',
+              border: `1px solid ${belowMinimum ? 'var(--warning, #f59e0b)' : 'var(--border)'}`,
               borderRadius: 8,
               padding: '10px 14px',
               marginBottom: '1rem',
@@ -295,6 +356,18 @@ export default function Overtime() {
                   {netHours.toFixed(2)} h
                 </strong>
               </div>
+              {/* PSSRM s.4.1(e) minimum threshold warning */}
+              {belowMinimum && (
+                <p style={{ margin: '8px 0 0', color: 'var(--warning, #b45309)', fontSize: '0.82rem', fontWeight: 500 }}>
+                  ⚠ PSSRM requires at least 1 net hour to qualify for overtime or TOIL.
+                </p>
+              )}
+              {/* PSSRM Unsocial Hours indicator */}
+              {isUnsocialHours && (
+                <p style={{ margin: '6px 0 0', color: 'var(--accent)', fontSize: '0.82rem', fontWeight: 500 }}>
+                  📅 Unsocial hours detected (Saturday/Sunday) — additional unsocial hours payment may apply. See PSSRM s.4.1 Unsocial Hours.
+                </p>
+              )}
             </div>
           )}
 
@@ -337,18 +410,38 @@ export default function Overtime() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="ot-remarks">Remarks (optional)</label>
+            <label htmlFor="ot-location">
+              Location
+              {['Weekend / Field Work', 'Emergency Callout', 'Overseas Mission'].includes(form.overtime_type) && (
+                <span style={{ color: 'var(--danger)', marginLeft: 4 }}>*</span>
+              )}
+              {!['Weekend / Field Work', 'Emergency Callout', 'Overseas Mission'].includes(form.overtime_type) && (
+                <span className="text-muted" style={{ fontWeight: 400, marginLeft: 6 }}>optional</span>
+              )}
+            </label>
+            <input
+              id="ot-location"
+              type="text"
+              value={form.location}
+              onChange={(e) => setForm((prev) => ({ ...prev, location: e.target.value }))}
+              placeholder={LOCATION_PLACEHOLDER[form.overtime_type] || 'Where did you work?'}
+              maxLength={255}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="ot-remarks">Remarks <span className="text-muted" style={{ fontWeight: 400 }}>optional</span></label>
             <textarea
               id="ot-remarks"
-              rows={3}
+              rows={2}
               value={form.remarks}
               onChange={(e) => setForm((prev) => ({ ...prev, remarks: e.target.value }))}
-              placeholder="Reason, project, or incident reference..."
+              placeholder="Supervisor direction, project name, incident reference..."
             />
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <Button type="submit" variant="primary" loading={submitLoading} loadingText="Saving...">
+            <Button type="submit" variant="primary" loading={submitLoading} loadingText="Saving..." disabled={belowMinimum}>
               Save overtime entry
             </Button>
             <Button
@@ -426,6 +519,7 @@ export default function Overtime() {
                       <th title="Net hours after deducting breaks">Net hrs</th>
                       <th title="Break / non-working deduction">Break</th>
                       <th>Type</th>
+                      <th>Location</th>
                       <th>Remarks</th>
                       <th>Action</th>
                     </tr>
@@ -449,6 +543,9 @@ export default function Overtime() {
                         </td>
                         <td>
                           <OvertimeTypeBadge type={entry.overtime_type} />
+                        </td>
+                        <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                          {entry.location || '—'}
                         </td>
                         <td>{entry.remarks || '—'}</td>
                         <td>

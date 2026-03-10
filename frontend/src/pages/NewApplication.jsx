@@ -56,6 +56,7 @@ export default function NewApplication() {
   const [overlayData, setOverlayData] = useState(null);
   const [registeredSignature, setRegisteredSignature] = useState(null);
   const [destinationSuggestions, setDestinationSuggestions] = useState(() => readDestinationHistory());
+  const [toilBalance, setToilBalance] = useState(null);
 
   // Fetch the user's registered signature once so the preview can display it
   useEffect(() => {
@@ -66,6 +67,15 @@ export default function NewApplication() {
       .catch(() => {});
     return () => { cancelled = true; };
   }, [user?.has_signature, request]);
+
+  // Fetch TOIL balance so the form can show available hours when TOIL is selected
+  useEffect(() => {
+    let cancelled = false;
+    request('/leave/toil-balance')
+      .then((data) => { if (!cancelled) setToilBalance(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [request]);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,6 +137,7 @@ export default function NewApplication() {
           loading={loading}
           onFormChange={setOverlayData}
           destinationSuggestions={destinationSuggestions}
+          toilBalance={toilBalance}
         />
       </div>
       <aside className="apply-page-preview" aria-label="Form 4-9 preview">

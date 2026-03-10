@@ -17,7 +17,7 @@ const ROUTE_TITLES = {
   '/faq': 'FAQ',
   '/supervisor': 'Approvals',
   '/director': 'Director',
-  '/admin': 'Admin',
+  '/settings': 'Settings',
 };
 
 function getAppName() {
@@ -125,8 +125,8 @@ export default function Layout() {
                 </NavLink>
               )}
               {hasRole(ROLE_IDS.Admin) && (
-                <NavLink to="/admin" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-                  <span className="nav-icon">⚙️</span> Admin
+                <NavLink to="/settings" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+                  <span className="nav-icon">⚙️</span> Settings
                 </NavLink>
               )}
             </div>
