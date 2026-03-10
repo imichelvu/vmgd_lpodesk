@@ -96,7 +96,7 @@ export default function UserFormModal({
               name="username"
               value={currentForm.username}
               onChange={handleChange}
-              placeholder="e.g. imichel (for login)"
+              placeholder="e.g. jdoe (for login)"
             />
           </div>
           <div className="form-group">

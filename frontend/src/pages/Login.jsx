@@ -89,7 +89,7 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="username"
-              placeholder="e.g. imichel or you@vmgd.gov.vu"
+              placeholder="e.g. jdoe or you@vmgd.gov.vu"
             />
           </div>
           <div className="form-group">

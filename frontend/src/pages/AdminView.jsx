@@ -513,7 +513,7 @@ export default function AdminView() {
                     type="text"
                     value={adUsername}
                     onChange={(e) => setAdUsername(e.target.value)}
-                    placeholder="e.g. imichel or your AD logon"
+                    placeholder="e.g. jdoe or your AD logon"
                     autoComplete="username"
                     disabled={syncLoading}
                   />

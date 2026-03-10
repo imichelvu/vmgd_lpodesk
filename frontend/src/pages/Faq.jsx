@@ -184,7 +184,7 @@ const SECTIONS = [
     items: [
       {
         q: 'How do I log in?',
-        a: `Enter your username (e.g., imichel) or your email address, along with your password, on the login page. Contact Admin if you do not know your credentials.`,
+        a: `Enter your username (e.g., jdoe) or your email address, along with your password, on the login page. Contact Admin if you do not know your credentials.`,
       },
       {
         q: 'How do I reset my password?',
