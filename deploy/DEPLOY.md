@@ -13,7 +13,7 @@ Internet
    │
    ▼
 Apache2 :80  (leavedesk.vmgd.gov.vu)
-   ├── /          → serves /var/www/leavedesk/dist/  (static files)
+   ├── /          → serves /var/www/leavedesk/frontend/dist/  (static files)
    └── /api/*     → ProxyPass → Node.js :5000
                                     │
                                     └── PostgreSQL :5432
@@ -75,8 +75,16 @@ cd /var/www/leavedesk
 # Install backend dependencies
 cd backend && npm install --omit=dev && cd ..
 
-# Install frontend dependencies (needed for the build step)
+# Install frontend dependencies (needed for the build)
 cd frontend && npm install && cd ..
+
+# After this, the repo structure is:
+#   /var/www/leavedesk/
+#   ├── backend/          ← Node.js API
+#   ├── frontend/         ← React app source
+#   │   └── dist/         ← built by `npm run build` (step 6)
+#   ├── deploy/           ← configs and this guide
+#   └── logs/             ← created in step 8
 ```
 
 ---
@@ -129,7 +137,8 @@ node src/db/seed.js          # only on first deploy
 ```bash
 cd /var/www/leavedesk/frontend
 npm run build
-# Output: frontend/dist/
+# Output: /var/www/leavedesk/frontend/dist/
+#         Apache2 serves this directory directly (no copy needed)
 ```
 
 ---
@@ -206,11 +215,10 @@ pm2 reload leavedesk-api
 
 # If frontend changed:
 cd frontend && npm install && npm run build && cd ..
+# Apache2 serves frontend/dist/ directly — no restart needed
 
 # Run any new migrations:
 # node backend/src/db/migrate-*.js
-
-sudo systemctl reload apache2   # picks up new static files immediately
 ```
 
 ---

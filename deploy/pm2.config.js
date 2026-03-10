@@ -26,9 +26,9 @@ module.exports = {
       restart_delay: 3000,
       watch: false,
 
-      // Logging
-      out_file:   '../logs/leavedesk-api-out.log',
-      error_file: '../logs/leavedesk-api-err.log',
+      // Logging — logs/ sits at the repo root: /var/www/leavedesk/logs/
+      out_file:   '/var/www/leavedesk/logs/leavedesk-api-out.log',
+      error_file: '/var/www/leavedesk/logs/leavedesk-api-err.log',
       merge_logs: true,
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
     },
