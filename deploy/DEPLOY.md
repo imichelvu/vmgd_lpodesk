@@ -205,20 +205,25 @@ Then open `http://leavedesk.vmgd.gov.vu` in a browser — login page should appe
 
 ## 10. Deploying updates
 
+After every `git push` from your dev machine, SSH into the server and run:
+
 ```bash
-cd /var/www/leavedesk
-git pull
+bash /var/www/leavedesk/deploy/update.sh
+```
 
-# If backend changed:
-cd backend && npm install --omit=dev && cd ..
-pm2 reload leavedesk-api
+This single command:
+1. `git pull` — fetches the latest code from GitHub
+2. Installs/updates backend npm dependencies
+3. Runs all migrations (safe to re-run — all are idempotent)
+4. Rebuilds the frontend (`npm run build`)
+5. Reloads the backend via PM2 (zero-downtime)
 
-# If frontend changed:
-cd frontend && npm install && npm run build && cd ..
-# Apache2 serves frontend/dist/ directly — no restart needed
+Apache2 picks up the new `frontend/dist/` immediately — no reload needed.
 
-# Run any new migrations:
-# node backend/src/db/migrate-*.js
+### First-time setup of the script
+
+```bash
+chmod +x /var/www/leavedesk/deploy/update.sh
 ```
 
 ---
