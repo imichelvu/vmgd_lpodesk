@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VMGD LeaveDesk SRS</title>
+
+<style>
+
+body{
+font-family: "Segoe UI", Arial, sans-serif;
+background:#f4f6f8;
+margin:0;
+color:#222;
+}
+
+.container{
+max-width:1100px;
+margin:auto;
+background:white;
+padding:60px;
+}
+
+h1{font-size:36px;margin-bottom:0}
+h2{border-bottom:2px solid #eee;padding-bottom:5px;margin-top:40px}
+h3{margin-top:25px}
+
+table{
+width:100%;
+border-collapse:collapse;
+margin:20px 0;
+}
+
+table th{
+background:#0a5c8f;
+color:white;
+text-align:left;
+padding:8px;
+}
+
+table td{
+border:1px solid #ddd;
+padding:8px;
+}
+
+code, pre{
+background:#f1f1f1;
+padding:10px;
+border-radius:5px;
+display:block;
+overflow:auto;
+}
+
+.toc{
+background:#f9fafb;
+border:1px solid #e2e8f0;
+padding:20px;
+margin-bottom:40px;
+}
+
+.screenshot{
+border:2px dashed #bbb;
+height:260px;
+display:flex;
+align-items:center;
+justify-content:center;
+color:#666;
+font-style:italic;
+margin:20px 0;
+}
+
+.diagram{
+background:#f7f7f7;
+border-left:5px solid #0a5c8f;
+padding:15px;
+font-family:monospace;
+margin:20px 0;
+}
+
+footer{
+margin-top:60px;
+text-align:center;
+color:#888;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Software Requirements Specification (SRS)</h1>
+<h2>VMGD LeaveDesk — Online Leave Management System</h2>
+
+<table>
+<tr><th>Field</th><th>Value</th></tr>
+<tr><td>Document version</td><td>1.0</td></tr>
+<tr><td>Status</td><td>Draft</td></tr>
+<tr><td>Author</td><td>Igor Michel</td></tr>
+<tr><td>Organisation</td><td>Vanuatu Meteorology & Geo-Hazards Department (VMGD)</td></tr>
+<tr><td>Ministry</td><td>Ministry of Climate Change</td></tr>
+<tr><td>Date</td><td>March 2026</td></tr>
+</table>
+
+<hr>
+
+<h2>Table of Contents</h2>
+
+<div class="toc">
+
+1. <a href="#intro">Introduction</a><br>
+2. <a href="#overall">Overall Description</a><br>
+3. <a href="#stakeholders">Stakeholders and User Classes</a><br>
+4. <a href="#functional">Functional Requirements</a><br>
+5. <a href="#nonfunctional">Non-Functional Requirements</a><br>
+6. <a href="#interfaces">External Interface Requirements</a><br>
+7. <a href="#constraints">System Constraints</a><br>
+8. <a href="#data">Data Requirements</a><br>
+9. <a href="#rules">Business Rules</a><br>
+10. <a href="#appendices">Appendices</a>
+
+</div>
+
+<hr>
+
+<h2 id="intro">1. Introduction</h2>
+
+<h3>1.1 Purpose</h3>
+
+<p>
+This document specifies the software requirements for <b>VMGD LeaveDesk</b>, a web-based leave management system designed to replace the manual paper-based PSC Form 4-9 workflow currently in use at the Vanuatu Meteorology & Geo-Hazards Department. It serves as the authoritative reference for developers, testers, system administrators, and project stakeholders.
+</p>
+
+<h3>1.2 Scope</h3>
+
+<p>
+LeaveDesk automates the full life cycle of a staff leave application — from submission through multi-level approval to final record keeping — in compliance with the <b>Public Service Staff Rules Manual (PSSRM)</b> and the <b>Employment Act [Cap 160] of Vanuatu</b>. It also provides overtime and Time Off In Lieu (TOIL) tracking with PSSRM-compliant rules.
+</p>
+
+<div class="screenshot">
+Screenshot placeholder — LeaveDesk system overview
+</div>
+
+<h3>In scope:</h3>
+
+<ul>
+<li>Staff leave application (PSC Form 4-9)</li>
+<li>Multi-level approval workflow (Superior → Director)</li>
+<li>Leave balance accrual and deduction engine</li>
+<li>Overtime & TOIL recording and entitlement calculation</li>
+<li>Email notifications to approvers and applicants</li>
+<li>Role-based access control (Staff, PSO, Manager, Director, Admin)</li>
+<li>Admin panel for user, delegation, policy, and settings management</li>
+<li>Printable approved PSC Form 4-9 with digital signatures</li>
+<li>Deployment on Ubuntu / Apache2 / PM2</li>
+</ul>
+
+<h3>Out of scope:</h3>
+
+<ul>
+<li>Payroll integration</li>
+<li>Biometric or physical attendance hardware integration</li>
+<li>Mobile native applications (iOS/Android)</li>
+<li>Integration with Active Directory (AD sync available as optional import only)</li>
+</ul>
+
+
+<h2 id="overall">2. Overall Description</h2>
+
+<h3>2.1 Product Perspective</h3>
+
+<div class="diagram">
+Staff Browser
+     │
+     ▼
+Apache2 (port 80)
+  ├── /           → React SPA (frontend/dist)
+  └── /api/*      → Node.js / Express (port 5000)
+                         │
+                         └── PostgreSQL (port 5432)
+</div>
+
+<div class="screenshot">
+Screenshot placeholder — System architecture diagram
+</div>
+
+
+<h2 id="stakeholders">3. Stakeholders and User Classes</h2>
+
+<table>
+<tr>
+<th>Role</th>
+<th>ID</th>
+<th>Description</th>
+</tr>
+
+<tr>
+<td><b>Staff</b></td>
+<td>1</td>
+<td>Any VMGD employee. Submits leave applications and records overtime.</td>
+</tr>
+
+<tr>
+<td><b>PSO</b></td>
+<td>2</td>
+<td>Principal Staff Officer. First-level approver for subordinates' leave.</td>
+</tr>
+
+<tr>
+<td><b>Manager</b></td>
+<td>3</td>
+<td>Division Manager.</td>
+</tr>
+
+<tr>
+<td><b>Director</b></td>
+<td>4</td>
+<td>Final approver.</td>
+</tr>
+
+<tr>
+<td><b>Admin</b></td>
+<td>5</td>
+<td>HR / IT Administrator.</td>
+</tr>
+
+</table>
+
+<div class="screenshot">
+Screenshot placeholder — Approval workflow interface
+</div>
+
+
+<h2 id="functional">4. Functional Requirements</h2>
+
+<div class="screenshot">
+Screenshot placeholder — Leave application UI
+</div>
+
+<div class="screenshot">
+Screenshot placeholder — PSC Form preview with signatures
+</div>
+
+
+<h2 id="nonfunctional">5. Non-Functional Requirements</h2>
+
+<div class="screenshot">
+Screenshot placeholder — Performance monitoring dashboard
+</div>
+
+
+<h2 id="interfaces">6. External Interface Requirements</h2>
+
+<div class="screenshot">
+Screenshot placeholder — API documentation
+</div>
+
+
+<h2 id="constraints">7. System Constraints</h2>
+
+<div class="screenshot">
+Screenshot placeholder — deployment architecture
+</div>
+
+
+<h2 id="data">8. Data Requirements</h2>
+
+<div class="screenshot">
+Screenshot placeholder — database schema diagram
+</div>
+
+
+<h2 id="rules">9. Business Rules</h2>
+
+<div class="screenshot">
+Screenshot placeholder — leave policy configuration
+</div>
+
+
+<h2 id="appendices">10. Appendices</h2>
+
+<div class="screenshot">
+Screenshot placeholder — system status flow diagram
+</div>
+
+<footer>
+VMGD LeaveDesk — Software Requirements Specification v1.0
+</footer>
+
+</div>
+
+</body>
+</html>
