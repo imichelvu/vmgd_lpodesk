@@ -1,3 +1,8 @@
+/**
+ * Author: Igor Michel
+ * Purpose: Define application routes and role-based access control for LPODesk.
+ * Last updated: 2026-03-11
+ */
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
@@ -7,20 +12,18 @@ import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
-import NewApplication from './pages/NewApplication';
-import Overtime from './pages/Overtime';
-import Faq from './pages/Faq';
-import SupervisorView from './pages/SupervisorView';
-import DirectorView from './pages/DirectorView';
+import CreateRequest from './pages/CreateRequest';
+import MyRequests from './pages/MyRequests';
+import RequestDetails from './pages/RequestDetails';
+import PendingApprovals from './pages/PendingApprovals';
 import AdminView from './pages/AdminView';
-import ApplicationDetail from './pages/ApplicationDetail';
-import ApplicationPrint from './pages/ApplicationPrint';
 import Profile from './pages/Profile';
+import Faq from './pages/Faq';
 import AppLoader from './components/AppLoader';
 
 function PrivateRoute({ children, allowedRoleIds }) {
   const { user, loading } = useAuth();
-  if (loading) return <AppLoader message="Loading VMGD LeaveDesk..." />;
+  if (loading) return <AppLoader message="Loading LPODesk..." />;
   if (!user) return <Navigate to="/login" replace />;
   if (allowedRoleIds && !allowedRoleIds.some((rid) => (user.role_ids || []).includes(rid))) {
     return <Navigate to="/" replace />;
@@ -44,24 +47,15 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="profile" element={<Profile />} />
-        <Route path="apply" element={<NewApplication />} />
-        <Route path="overtime" element={<Overtime />} />
+        <Route path="requests/new" element={<CreateRequest />} />
+        <Route path="requests" element={<MyRequests />} />
+        <Route path="requests/:id" element={<RequestDetails />} />
         <Route path="faq" element={<Faq />} />
-        <Route path="application/:id" element={<ApplicationDetail />} />
-        <Route path="application/:id/print" element={<ApplicationPrint />} />
         <Route
-          path="supervisor"
+          path="approvals"
           element={
-            <PrivateRoute allowedRoleIds={[ROLE_IDS.PSO, ROLE_IDS.Manager]}>
-              <SupervisorView />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="director"
-          element={
-            <PrivateRoute allowedRoleIds={[ROLE_IDS.Director]}>
-              <DirectorView />
+            <PrivateRoute allowedRoleIds={[ROLE_IDS.Manager, ROLE_IDS.ICTManager, ROLE_IDS.Procurement, ROLE_IDS.Director]}>
+              <PendingApprovals />
             </PrivateRoute>
           }
         />

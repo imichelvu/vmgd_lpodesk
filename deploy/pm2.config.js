@@ -1,5 +1,8 @@
 /**
- * PM2 process config for VMGD LeaveDesk backend.
+ * Author: Igor Michel
+ * Purpose: PM2 process config for LPODesk backend.
+ * Last updated: 2026-03-11
+ *
  * Usage:
  *   pm2 start deploy/pm2.config.js
  *   pm2 save
@@ -8,7 +11,7 @@
 module.exports = {
   apps: [
     {
-      name: 'leavedesk-api',
+      name: 'lpodesk-api',
       cwd: './backend',
       script: 'src/index.js',
       interpreter: 'node',
@@ -26,9 +29,9 @@ module.exports = {
       restart_delay: 3000,
       watch: false,
 
-      // Logging — logs/ sits at the repo root: /var/www/leavedesk/logs/
-      out_file:   '/var/www/leavedesk/logs/leavedesk-api-out.log',
-      error_file: '/var/www/leavedesk/logs/leavedesk-api-err.log',
+      // Logging — logs/ sits at the repo root: /var/www/lpodesk/logs/
+      out_file:   '/var/www/lpodesk/logs/lpodesk-api-out.log',
+      error_file: '/var/www/lpodesk/logs/lpodesk-api-err.log',
       merge_logs: true,
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
     },

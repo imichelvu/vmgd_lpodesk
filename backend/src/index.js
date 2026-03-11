@@ -1,16 +1,19 @@
+/**
+ * Author: Igor Michel
+ * Purpose: Express app entry point for LPODesk backend API.
+ * Last updated: 2026-03-11
+ */
 import './loadEnv.js';
 import express from 'express';
 import cors from 'cors';
 import pool from './db/pool.js';
 import authRoutes from './routes/auth.js';
-import leaveRoutes from './routes/leave.js';
+import requestRoutes from './routes/requestRoutes.js';
+import approvalRoutes from './routes/approvalRoutes.js';
+import documentRoutes from './routes/documentRoutes.js';
 import usersRoutes from './routes/users.js';
 import delegationsRoutes from './routes/delegations.js';
-import overtimeRoutes from './routes/overtime.js';
 import profileRoutes from './routes/profile.js';
-import leavePolicyRoutes from './routes/leavePolicyRoutes.js';
-import settingsRoutes from './routes/settings.js';
-
 const app = express();
 const PORT = process.env.PORT || 4000;
 const startTime = Date.now();
@@ -28,24 +31,22 @@ app.use(cors({
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
-app.use('/api/leave', leaveRoutes);
-app.use('/api/overtime', overtimeRoutes);
+app.use('/api/requests', requestRoutes);
+app.use('/api/requests', approvalRoutes);
+app.use('/api/documents', documentRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/delegations', delegationsRoutes);
-app.use('/api/admin/leave-policies', leavePolicyRoutes);
-app.use('/api/settings', settingsRoutes);
-
 app.get('/', (_, res) => {
   res.type('html').send(`
     <!DOCTYPE html>
     <html>
-      <head><title>VMGD Leave API</title></head>
+      <head><title>LPODesk API</title></head>
       <body style="font-family: system-ui; padding: 2rem;">
-        <h1>VMGD Leave API</h1>
+        <h1>LPODesk API</h1>
         <p>Backend is running. Use the frontend app to sign in.</p>
         <ul>
-    <li><a href="/api/health">Health check</a> (JSON)</li>
+          <li><a href="/api/health">Health check</a> (JSON)</li>
           <li><a href="/api/troubleshoot">Troubleshoot</a> (JSON)</li>
           <li><a href="http://localhost:5173">Open frontend (localhost:5173)</a></li>
         </ul>
@@ -89,7 +90,7 @@ app.use((err, req, res, next) => {
 
 const HOST = process.env.HOST || '127.0.0.1';
 const server = app.listen(PORT, HOST, () => {
-  console.log(`VMGD Leave API running on http://${HOST}:${PORT}`);
+  console.log(`LPODesk API running on http://${HOST}:${PORT}`);
   const hasDb = !!process.env.DATABASE_URL;
   const hasJwt = !!(process.env.JWT_SECRET && String(process.env.JWT_SECRET).trim());
   if (!hasDb) console.warn('WARN: DATABASE_URL is not set');
@@ -97,7 +98,6 @@ const server = app.listen(PORT, HOST, () => {
   if (hasDb && hasJwt) console.log('Env OK: DATABASE_URL and JWT_SECRET set');
 });
 
-// Graceful error handling — prevents cryptic crash when port is already in use
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`\n ERROR: Port ${PORT} is already in use.`);

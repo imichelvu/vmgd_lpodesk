@@ -7,12 +7,12 @@ const API_BASE = (import.meta.env.VITE_API_URL ?? '').trim() || '/api';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [token, setTokenState] = useState(() => localStorage.getItem('leave_token'));
+  const [token, setTokenState] = useState(() => localStorage.getItem('lpo_token'));
   const [loading, setLoading] = useState(!!token);
 
   const setToken = useCallback((t) => {
-    if (t) localStorage.setItem('leave_token', t);
-    else localStorage.removeItem('leave_token');
+    if (t) localStorage.setItem('lpo_token', t);
+    else localStorage.removeItem('lpo_token');
     setTokenState(t);
   }, []);
 
@@ -124,4 +124,6 @@ export const ROLE_IDS = {
   Manager: 3,
   Director: 4,
   Admin: 5,
+  ICTManager: 6,
+  Procurement: 7,
 };

@@ -1,10 +1,17 @@
-// Role Reference IDs - use these for routing and permissions (not string names)
+/**
+ * Author: Igor Michel
+ * Purpose: Define role IDs, names, and request status constants for LPODesk.
+ * Last updated: 2026-03-11
+ */
+
 export const ROLE_IDS = {
   Staff: 1,
   PSO: 2,
   Manager: 3,
   Director: 4,
   Admin: 5,
+  ICTManager: 6,
+  Procurement: 7,
 };
 
 export const ROLE_NAMES = {
@@ -13,12 +20,17 @@ export const ROLE_NAMES = {
   3: 'Manager',
   4: 'Director',
   5: 'Admin',
+  6: 'ICT Manager',
+  7: 'Procurement Officer',
 };
 
-export const LEAVE_STATUS = {
-  Pending_PSO: 'Pending_PSO',
-  Pending_Manager: 'Pending_Manager',
-  Pending_Director: 'Pending_Director',
-  Approved: 'Approved',
-  Disapproved: 'Disapproved',
+export const REQUEST_STATUS = {
+  draft: 'draft',
+  submitted: 'submitted',
+  manager_approved: 'manager_approved',
+  ict_approved: 'ict_approved',
+  procurement_approved: 'procurement_approved',
+  director_approved: 'director_approved',
+  rejected: 'rejected',
+  completed: 'completed',
 };

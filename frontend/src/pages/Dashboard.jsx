@@ -1,434 +1,179 @@
 /**
  * Author: Igor Michel
- * Purpose: Render user dashboard with leave summaries, applications, and inline approval actions.
- * Last updated: 2026-02-09
+ * Purpose: Role-aware dashboard showing request stats and quick actions for LPODesk.
+ * Last updated: 2026-03-11
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { ROLE_IDS } from '../context/AuthContext';
-import { useApi } from '../hooks/useApi';
-import { useRequestList } from '../hooks/useRequestList';
-import { usePagination } from '../hooks/usePagination';
-import Button from '../components/Button';
-import StatsRow from '../components/StatsRow';
-import PageHeader from '../components/PageHeader';
+import { useAuth, ROLE_IDS } from '../context/AuthContext';
 import StatusBadge from '../components/StatusBadge';
-import { formatLeaveEnd, formatLeaveRange, formatLeaveStart } from '../utils/leaveDateDisplay';
+import PageHeader from '../components/PageHeader';
+import StatsRow from '../components/StatsRow';
+
+const CATEGORIES = ['ICT Equipment', 'Office Supplies', 'Services', 'Maintenance', 'Consultancy'];
+
+function formatAmount(amount) {
+  if (amount == null) return '—';
+  return new Intl.NumberFormat('en-VU', { style: 'currency', currency: 'VUV', maximumFractionDigits: 0 }).format(amount);
+}
 
 export default function Dashboard() {
-  const { user, hasRole } = useAuth();
-  const { request } = useApi();
-  const { list: applications, loading, error, reload: reloadApplications } = useRequestList(request, '/leave/mine', []);
-  const [applicationsTab, setApplicationsTab] = useState('active');
-  const [historyPage, setHistoryPage] = useState(1);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState('');
-  const [historyItems, setHistoryItems] = useState([]);
-  const [historyTotalPages, setHistoryTotalPages] = useState(1);
-  const [historyTotal, setHistoryTotal] = useState(0);
-  const [balances, setBalances] = useState([]);
-  const [balancesYear, setBalancesYear] = useState(new Date().getFullYear());
-  const [balancesError, setBalancesError] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
-  const [actionDraft, setActionDraft] = useState({
-    appId: null,
-    action: null,
-    comment: '',
-    error: '',
-  });
-  const activeApplications = useMemo(
-    () => applications.filter((a) => String(a.status || '').startsWith('Pending')),
-    [applications]
-  );
-  const {
-    page,
-    setPage,
-    totalPages,
-    pageItems: pagedApplications,
-    hasPagination,
-    canPrev,
-    canNext,
-  } = usePagination(activeApplications, 20);
-  const HISTORY_PAGE_SIZE = 10;
+  const { user, api, hasRole } = useAuth();
+  const [myRequests, setMyRequests] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [loadingMine, setLoadingMine] = useState(true);
+  const [loadingPending, setLoadingPending] = useState(false);
+  const [error, setError] = useState('');
 
-  const loadHistory = useCallback(async () => {
-    setHistoryLoading(true);
-    setHistoryError('');
-    try {
-      const query = new URLSearchParams({
-        page: String(historyPage),
-        pageSize: String(HISTORY_PAGE_SIZE),
-      });
-      const data = await request(`/leave/mine/history?${query.toString()}`);
-      setHistoryItems(Array.isArray(data?.items) ? data.items : []);
-      setHistoryTotalPages(Number(data?.totalPages) || 1);
-      setHistoryTotal(Number(data?.total) || 0);
-    } catch (e) {
-      setHistoryError(e?.message || 'Could not load your history.');
-      setHistoryItems([]);
-      setHistoryTotalPages(1);
-      setHistoryTotal(0);
-    } finally {
-      setHistoryLoading(false);
-    }
-  }, [historyPage, request]);
+  const isApprover = hasRole([ROLE_IDS.Manager, ROLE_IDS.ICTManager, ROLE_IDS.Procurement, ROLE_IDS.Director]);
+  const isAdmin = hasRole(ROLE_IDS.Admin);
 
   useEffect(() => {
-    if (applicationsTab === 'history') loadHistory();
-  }, [applicationsTab, loadHistory]);
-
-  const canApproveApplication = (app) => (
-    (app.status === 'Pending_PSO' && (hasRole(ROLE_IDS.PSO) || hasRole(ROLE_IDS.Manager)))
-    || (app.status === 'Pending_Manager' && hasRole(ROLE_IDS.Manager))
-    || (app.status === 'Pending_Director' && hasRole(ROLE_IDS.Director))
-  );
-
-  const resetDraft = () => {
-    setActionDraft({ appId: null, action: null, comment: '', error: '' });
-  };
-
-  const openActionDraft = (appId, action) => {
-    setActionDraft({ appId, action, comment: '', error: '' });
-  };
-
-  const submitDecision = async () => {
-    if (!actionDraft.appId || !actionDraft.action) return;
-    if (actionDraft.action === 'disapprove' && !actionDraft.comment.trim()) {
-      setActionDraft((prev) => ({ ...prev, error: 'Comment is mandatory for disapproval.' }));
-      return;
-    }
-
-    setActionLoading(true);
-    try {
-      await request(`/leave/${actionDraft.appId}/approve`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: actionDraft.action,
-          comment: actionDraft.comment.trim() || undefined,
-          // approver_signature_data not sent — backend uses the approver's registered profile signature
-        }),
-      });
-      resetDraft();
-      reloadApplications();
-      if (applicationsTab === 'history') loadHistory();
-    } catch (e) {
-      setActionDraft((prev) => ({ ...prev, error: e?.message || 'Could not complete approval action.' }));
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const stats = useMemo(() => {
-    if (!Array.isArray(applications) || !applications.length) {
-      return [];
-    }
-    const total = applications.length;
-    const pending = applications.filter((a) => a.status && String(a.status).startsWith('Pending')).length;
-    const approved = applications.filter((a) => a.status === 'Approved').length;
-    const disapproved = applications.filter((a) => a.status === 'Disapproved').length;
-    return [
-      { label: 'Total applications', value: total, tone: 'default' },
-      { label: 'Pending', value: pending, tone: pending ? 'warning' : 'default', hint: pending ? 'Waiting on approvals' : 'None pending' },
-      { label: 'Approved', value: approved, tone: approved ? 'success' : 'default' },
-      { label: 'Disapproved', value: disapproved, tone: disapproved ? 'danger' : 'default' },
-    ];
-  }, [applications]);
-
-  useEffect(() => {
-    let cancelled = false;
-    request('/leave/balances')
-      .then((data) => {
-        if (cancelled) return;
-        setBalances(Array.isArray(data?.items) ? data.items : []);
-        setBalancesYear(Number(data?.year) || new Date().getFullYear());
-        setBalancesError('');
+    setLoadingMine(true);
+    api('/requests/mine')
+      .then(async (r) => {
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.error || `Server error ${r.status}`);
+        return data;
       })
-      .catch((err) => {
-        if (cancelled) return;
-        setBalances([]);
-        setBalancesError(err?.message || 'Could not load leave balances.');
-      });
-    return () => { cancelled = true; };
-  }, [request]);
+      .then((data) => setMyRequests(Array.isArray(data) ? data : []))
+      .catch((err) => setError(err.message || 'Failed to load your requests'))
+      .finally(() => setLoadingMine(false));
+  }, [api]);
+
+  useEffect(() => {
+    if (!isApprover && !isAdmin) return;
+    setLoadingPending(true);
+    api('/requests/pending')
+      .then(async (r) => {
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) return [];
+        return data;
+      })
+      .then((data) => setPendingRequests(Array.isArray(data) ? data : []))
+      .catch(() => {})
+      .finally(() => setLoadingPending(false));
+  }, [api, isApprover, isAdmin]);
+
+  const recentRequests = myRequests.slice(0, 5);
+
+  const stats = [
+    { label: 'My Requests', value: myRequests.length, tone: 'default' },
+    { label: 'Draft', value: myRequests.filter((r) => r.status === 'draft').length, tone: 'default' },
+    { label: 'In Progress', value: myRequests.filter((r) => !['draft','rejected','completed'].includes(r.status)).length, tone: myRequests.filter((r) => !['draft','rejected','completed'].includes(r.status)).length ? 'warning' : 'default' },
+    { label: 'Completed', value: myRequests.filter((r) => r.status === 'completed').length, tone: 'success' },
+  ];
 
   return (
-    <>
+    <div className="page-content">
       <PageHeader
-        title="Dashboard"
-        subtitle={`Welcome, ${user?.full_name}.`}
+        title={`Welcome, ${user?.full_name?.split(' ')[0] || 'User'}`}
+        subtitle="LPODesk — Local Purchase Order Request Workflow"
       />
 
-      <StatsRow items={stats} />
+      {error && <div className="alert alert-danger" role="alert">{error}</div>}
 
-      {error && (
-        <div className="alert alert-danger">
-          Could not load your applications: {error}
-        </div>
-      )}
-      {balancesError && (
-        <div className="alert alert-warning">
-          Could not load leave balances: {balancesError}
-        </div>
-      )}
+      <StatsRow stats={stats} />
 
-      <div className="card">
-        <div className="dashboard-section-title-row">
-          <h3 className="dashboard-section-title">My leave applications</h3>
-          {hasRole(ROLE_IDS.Staff) && (
-            <Button to="/apply" variant="primary">New application</Button>
-          )}
-        </div>
-        <p className="text-muted dashboard-helper-text">
-          View status of your applications. Use “New application” to submit PSC Form 4-9.
-        </p>
-        <div className="tabs" role="tablist" aria-label="My leave applications views">
-          <button
-            type="button"
-            className={`tab${applicationsTab === 'active' ? ' active' : ''}`}
-            onClick={() => setApplicationsTab('active')}
-          >
-            Active ({activeApplications.length})
-          </button>
-          <button
-            type="button"
-            className={`tab${applicationsTab === 'history' ? ' active' : ''}`}
-            onClick={() => setApplicationsTab('history')}
-          >
-            History
-          </button>
-        </div>
-
-        {applicationsTab === 'active' ? (
-          loading ? (
-            <p className="text-muted">Loading applications...</p>
-          ) : activeApplications.length === 0 ? (
-            <p className="text-muted">
-              No active applications right now.
-            </p>
-          ) : (
-          <>
-            <div className="dashboard-accordion-list">
-              {pagedApplications.map((app) => {
-                const isDraftForItem = actionDraft.appId === app.id;
-                const canApprove = canApproveApplication(app);
-                return (
-                  <details key={app.id} className="dashboard-accordion-item">
-                    <summary className="dashboard-accordion-summary">
-                      <div className="dashboard-accordion-headline">
-                        <strong>#{app.id} · {app.leave_type}</strong>
-                        <span className="text-muted">
-                          {formatLeaveRange(app)} · {app.total_working_days} days
-                        </span>
-                      </div>
-                      <StatusBadge status={app.status} />
-                    </summary>
-
-                    <div className="dashboard-accordion-content">
-                      <div className="dashboard-accordion-grid">
-                        <p><strong>Start:</strong> {formatLeaveStart(app)}</p>
-                        <p><strong>End:</strong> {formatLeaveEnd(app)}</p>
-                        <p><strong>Working days:</strong> {app.total_working_days}</p>
-                        <p><strong>Type:</strong> {app.leave_type}</p>
-                      </div>
-
-                      {canApprove && !isDraftForItem && !user?.has_signature && (
-                        <div className="alert alert-warning" style={{ marginTop: '0.75rem' }}>
-                          <Link to="/profile"><strong>Register your signature in My Profile</strong></Link>
-                          {' '}to approve or disapprove applications.
-                        </div>
-                      )}
-
-                      {canApprove && !isDraftForItem && user?.has_signature && (
-                        <div className="dashboard-accordion-actions">
-                          <Button type="button" variant="primary" onClick={() => openActionDraft(app.id, 'approve')}>
-                            Approve
-                          </Button>
-                          <Button type="button" variant="danger" onClick={() => openActionDraft(app.id, 'disapprove')}>
-                            Disapprove
-                          </Button>
-                        </div>
-                      )}
-
-                      {isDraftForItem && (
-                        <div className="dashboard-approval-box">
-                          {actionDraft.error ? <div className="alert alert-danger">{actionDraft.error}</div> : null}
-                          {actionDraft.action === 'disapprove' && (
-                            <div className="form-group">
-                              <label>Comment (mandatory for disapproval)</label>
-                              <textarea
-                                rows={3}
-                                value={actionDraft.comment}
-                                onChange={(e) => setActionDraft((prev) => ({ ...prev, comment: e.target.value, error: '' }))}
-                              />
-                            </div>
-                          )}
-                          <div className="alert alert-success" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                            <span>✓</span>
-                            <span>Your registered signature will be applied automatically.</span>
-                            <Link to="/profile" style={{ marginLeft: 'auto', fontSize: '0.8rem' }}>Change</Link>
-                          </div>
-                          <div className="dashboard-accordion-actions">
-                            <Button
-                              type="button"
-                              variant="primary"
-                              loading={actionLoading}
-                              loadingText="Processing..."
-                              onClick={submitDecision}
-                            >
-                              {actionDraft.action === 'approve' ? 'Confirm approve' : 'Confirm disapprove'}
-                            </Button>
-                            <Button type="button" variant="secondary" onClick={resetDraft}>
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-
-                      {!canApprove && (
-                        <div className="dashboard-accordion-meta">
-                          <Link to={`/application/${app.id}`}>Open full details</Link>
-                        </div>
-                      )}
-                    </div>
-                  </details>
-                );
-              })}
-            </div>
-            {hasPagination && (
-              <div className="table-pagination">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setPage((p) => p - 1)}
-                  disabled={!canPrev}
-                >
-                  Previous
-                </button>
-                <span className="table-pagination-info">
-                  Page {page} of {totalPages}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setPage((p) => p + 1)}
-                  disabled={!canNext}
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </>
-          )
-        ) : (
-          <>
-            {historyError ? <div className="alert alert-danger">{historyError}</div> : null}
-            {historyLoading ? (
-              <p className="text-muted">Loading history...</p>
-            ) : historyItems.length === 0 ? (
-              <p className="text-muted">No completed application history yet.</p>
-            ) : (
-              <div className="dashboard-accordion-list">
-                {historyItems.map((app) => (
-                  <details key={`hist-${app.id}`} className="dashboard-accordion-item">
-                    <summary className="dashboard-accordion-summary">
-                      <div className="dashboard-accordion-headline">
-                        <strong>#{app.id} · {app.leave_type}</strong>
-                        <span className="text-muted">
-                          {formatLeaveRange(app)} · {app.total_working_days} days
-                        </span>
-                      </div>
-                      <StatusBadge status={app.status} />
-                    </summary>
-                    <div className="dashboard-accordion-content">
-                      <div className="dashboard-accordion-grid">
-                        <p><strong>Start:</strong> {formatLeaveStart(app)}</p>
-                        <p><strong>End:</strong> {formatLeaveEnd(app)}</p>
-                        <p><strong>Working days:</strong> {app.total_working_days}</p>
-                        <p><strong>Type:</strong> {app.leave_type}</p>
-                        <p><strong>PSO:</strong> {app.approved_by_pso_name || '—'}</p>
-                        <p><strong>Manager:</strong> {app.approved_by_manager_name || '—'}</p>
-                        <p><strong>Director:</strong> {app.approved_by_director_name || '—'}</p>
-                      </div>
-                      <div className="dashboard-accordion-meta">
-                        <Link to={`/application/${app.id}`}>Open full details</Link>
-                      </div>
-                    </div>
-                  </details>
-                ))}
-              </div>
-            )}
-            {historyTotal > 0 && (
-              <div className="table-pagination">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
-                  disabled={historyPage <= 1 || historyLoading}
-                >
-                  Previous
-                </button>
-                <span className="table-pagination-info">
-                  Page {historyPage} of {historyTotalPages}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setHistoryPage((p) => Math.min(historyTotalPages, p + 1))}
-                  disabled={historyPage >= historyTotalPages || historyLoading}
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </>
+      <div className="dashboard-actions" style={{ display: 'flex', gap: '1rem', margin: '1.5rem 0', flexWrap: 'wrap' }}>
+        <Link to="/requests/new" className="btn btn-primary">+ New Request</Link>
+        <Link to="/requests" className="btn btn-secondary">View All My Requests</Link>
+        {isApprover && (
+          <Link to="/approvals" className="btn btn-secondary">
+            Pending Approvals {pendingRequests.length > 0 && <span className="badge">{pendingRequests.length}</span>}
+          </Link>
         )}
       </div>
 
-      <div className="card">
-        <h3 className="dashboard-section-title">Leave balances ({balancesYear})</h3>
-        {!balances.length ? (
-          <p className="text-muted">No leave balance data yet.</p>
+      <section>
+        <h2 className="section-title">Recent Requests</h2>
+        {loadingMine ? (
+          <p className="muted">Loading...</p>
+        ) : recentRequests.length === 0 ? (
+          <div className="empty-state">
+            <p>No requests yet. <Link to="/requests/new">Submit your first request.</Link></p>
+          </div>
         ) : (
           <div className="table-wrap">
-            <table>
+            <table className="data-table">
               <thead>
                 <tr>
-                  <th>Leave type</th>
-                  <th>Allocated</th>
-                  <th>Carry</th>
-                  <th>Used</th>
-                  <th>Available</th>
+                  <th>#</th>
+                  <th>Title</th>
+                  <th>Category</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
-                {balances.map((item) => (
-                  <tr key={item.leave_type}>
-                    <td>{item.leave_type}</td>
-                    <td>{Number(item.allocated_days).toFixed(1)}</td>
-                    <td>{Number(item.carry_forward_days).toFixed(1)}</td>
-                    <td>{Number(item.used_days).toFixed(1)}</td>
-                    <td>{Number(item.available_days).toFixed(1)}</td>
+                {recentRequests.map((req) => (
+                  <tr key={req.id}>
+                    <td>{req.id}</td>
+                    <td>{req.title}</td>
+                    <td><span className="tag">{req.category}</span></td>
+                    <td>{formatAmount(req.amount)}</td>
+                    <td><StatusBadge status={req.status} /></td>
+                    <td>{new Date(req.created_at).toLocaleDateString()}</td>
+                    <td><Link to={`/requests/${req.id}`} className="btn btn-sm btn-secondary">View</Link></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-      </div>
+        {myRequests.length > 5 && (
+          <div style={{ marginTop: '0.75rem' }}>
+            <Link to="/requests" className="link-subtle">View all {myRequests.length} requests →</Link>
+          </div>
+        )}
+      </section>
 
-      <div className="dashboard-quick-actions">
-        {hasRole([ROLE_IDS.PSO, ROLE_IDS.Manager]) && (
-          <Button to="/supervisor" variant="secondary">Go to Approvals</Button>
-        )}
-        {hasRole(ROLE_IDS.Director) && (
-          <Button to="/director" variant="secondary">Director view</Button>
-        )}
-        {hasRole(ROLE_IDS.Admin) && (
-          <Button to="/admin" variant="secondary">Admin</Button>
-        )}
-      </div>
-    </>
+      {isApprover && (
+        <section style={{ marginTop: '2rem' }}>
+          <h2 className="section-title">Pending Your Approval</h2>
+          {loadingPending ? (
+            <p className="muted">Loading...</p>
+          ) : pendingRequests.length === 0 ? (
+            <p className="muted">No requests pending your approval.</p>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Title</th>
+                    <th>Requester</th>
+                    <th>Category</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingRequests.slice(0, 5).map((req) => (
+                    <tr key={req.id}>
+                      <td>{req.id}</td>
+                      <td>{req.title}</td>
+                      <td>{req.requester_name}</td>
+                      <td><span className="tag">{req.category}</span></td>
+                      <td>{formatAmount(req.amount)}</td>
+                      <td><StatusBadge status={req.status} /></td>
+                      <td><Link to={`/requests/${req.id}`} className="btn btn-sm btn-primary">Review</Link></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {pendingRequests.length > 5 && (
+            <div style={{ marginTop: '0.75rem' }}>
+              <Link to="/approvals" className="link-subtle">View all {pendingRequests.length} pending →</Link>
+            </div>
+          )}
+        </section>
+      )}
+    </div>
   );
 }

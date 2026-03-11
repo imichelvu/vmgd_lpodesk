@@ -36,7 +36,7 @@ function escapeHtml(s) {
 }
 
 /**
- * Build a professional HTML email for leave notifications.
+ * Build a professional HTML email for procurement request notifications.
  * @param {{ title: string, bodyText: string, viewUrl: string|null, appName: string }}
  */
 function buildNotificationEmailHtml({ title, bodyText, viewUrl, appName }) {
@@ -65,7 +65,7 @@ function buildNotificationEmailHtml({ title, bodyText, viewUrl, appName }) {
           <tr>
             <td style="background:${headerBg};color:#ffffff;padding:20px 24px;">
               <h1 style="margin:0;font-size:20px;font-weight:600;letter-spacing:0.02em;">${safeAppName}</h1>
-              <p style="margin:6px 0 0;font-size:13px;opacity:0.9;">Leave application notification</p>
+              <p style="margin:6px 0 0;font-size:13px;opacity:0.9;">Procurement request notification</p>
             </td>
           </tr>
           <tr>
@@ -78,7 +78,7 @@ function buildNotificationEmailHtml({ title, bodyText, viewUrl, appName }) {
               </td></tr>
               <tr><td style="padding:0 0 8px;font-size:13px;color:${mutedColor};">Or copy this link:</td></tr>
               <tr><td style="font-size:13px;"><a href="${viewUrl}" style="color:${accent};word-break:break-all;">${escapeHtml(viewUrl)}</a></td></tr></table>`
-    : `<p style="margin:0;font-size:14px;color:${mutedColor};">Log in to the leave system and open <strong>Approvals</strong> to view this application.</p>`}
+              : `<p style="margin:0;font-size:14px;color:${mutedColor};">Log in to LPODesk and open <strong>Approvals</strong> to view this request.</p>`}
             </td>
           </tr>
           <tr>
@@ -100,7 +100,7 @@ function buildNotificationEmailHtml({ title, bodyText, viewUrl, appName }) {
  * @param {string} resetLink - Full URL to reset password (e.g. https://app.example.com/reset-password?token=xxx)
  * @param {string} appName - Application name for the email
  */
-export async function sendPasswordResetEmail(toEmail, resetLink, appName = 'Leave Application') {
+export async function sendPasswordResetEmail(toEmail, resetLink, appName = 'LPODesk') {
   const email = (toEmail || '').trim().toLowerCase();
   if (!email) return;
   const safeApp = escapeHtml(appName);
@@ -167,35 +167,24 @@ export async function sendEmail({ toEmail, subject, text, html }) {
 }
 
 /**
- * Create in-app notification and send email when sendEmailTo is set.
- * If leaveApplicationId is set and APP_URL/FRONTEND_URL is configured, appends a "View application" link to the email.
- * @param {Object} options - { userId, leaveApplicationId, title, body, sendEmailTo }
+ * Create in-app notification and optionally send email.
+ * @param {Object} options - { userId, requestId, title, body, sendEmailTo, viewUrl, appName }
  */
-export async function notifyUser({ userId, leaveApplicationId, title, body, sendEmailTo = null }) {
+export async function notifyUser({ userId, requestId, title, body, sendEmailTo = null, viewUrl = null, appName = null }) {
   const client = await pool.connect();
   try {
     await client.query(
-      'INSERT INTO notifications (user_id, leave_application_id, title, body) VALUES ($1, $2, $3, $4)',
-      [userId, leaveApplicationId || null, title, body || null]
+      'INSERT INTO notifications (user_id, request_id, title, body) VALUES ($1, $2, $3, $4)',
+      [userId, requestId || null, title, body || null]
     );
     if (sendEmailTo) {
-      const baseUrl = getAppUrl();
-      const viewUrl = baseUrl && leaveApplicationId ? `${baseUrl}/application/${leaveApplicationId}` : null;
+      const resolvedAppName = appName || process.env.NOTIFICATION_NAME || 'LPODesk';
       const bodyText = body || '';
-      const appName = process.env.NOTIFICATION_NAME || 'Leave System';
       const text = viewUrl
         ? `${bodyText}\n\n---\nView and take action:\n${viewUrl}\n`
-        : `${bodyText}\n\nLog in to the leave system and open Approvals to view this application.`;
-      const html = buildNotificationEmailHtml({ title, bodyText, viewUrl, appName });
-      if (!viewUrl && leaveApplicationId) {
-        console.warn('APP_URL (or FRONTEND_URL) not set in .env – add it so notification emails include a direct link to the application.');
-      }
-      await sendEmail({
-        toEmail: sendEmailTo,
-        subject: title,
-        text,
-        html,
-      });
+        : `${bodyText}\n\nLog in to LPODesk and open Approvals to view this request.`;
+      const html = buildNotificationEmailHtml({ title, bodyText, viewUrl, appName: resolvedAppName });
+      await sendEmail({ toEmail: sendEmailTo, subject: title, text, html });
     }
   } finally {
     client.release();
@@ -203,128 +192,17 @@ export async function notifyUser({ userId, leaveApplicationId, title, body, send
 }
 
 /**
- * Get all people who can approve at Pending_PSO (PSO + division Manager), deduplicated.
- * Used when submitting a new application so both PSO and Manager get the email.
- * Returns array of { userId, email } (email may be null if user has no email in DB).
+ * Get all users with a given role_id — used to notify the next stage approvers.
+ * @param {number} roleId
+ * @returns {Promise<Array<{userId: number, email: string}>>}
  */
-export async function getPendingPsoApprovers(applicationId) {
+export async function getUsersByRole(roleId) {
   const { rows } = await pool.query(
-    `SELECT la.applicant_id, u.division_id, u.reports_to_id
-     FROM leave_applications la
-     JOIN users u ON u.id = la.applicant_id
-     WHERE la.id = $1`,
-    [applicationId]
-  );
-  if (!rows.length) return [];
-  const { applicant_id: applicantId, division_id: divisionId, reports_to_id: reportsToId } = rows[0];
-  const seen = new Set();
-  const approvers = [];
-
-  const supervisor = await getSupervisorOrDelegate(applicantId);
-  if (supervisor && !seen.has(supervisor.userId)) {
-    seen.add(supervisor.userId);
-    approvers.push(supervisor);
-  }
-
-  if (divisionId) {
-    const manager = await getDivisionManager(divisionId);
-    if (manager && !seen.has(manager.userId)) {
-      seen.add(manager.userId);
-      approvers.push(manager);
-    }
-  }
-
-  return approvers;
-}
-
-/**
- * Get the next approver in the workflow: PSO -> Manager -> Director.
- * Returns { userId, email } or null.
- */
-export async function getNextApprover(applicationId) {
-  const { rows } = await pool.query(
-    `SELECT la.status, la.applicant_id, u.division_id, u.reports_to_id
-     FROM leave_applications la
-     JOIN users u ON u.id = la.applicant_id
-     WHERE la.id = $1`,
-    [applicationId]
-  );
-  if (!rows.length) return null;
-  const app = rows[0];
-  const status = app.status;
-
-  if (status === 'Pending_PSO') {
-    const next = await getSupervisorOrDelegate(app.applicant_id);
-    if (next) return next;
-    if (app.division_id) return getDivisionManager(app.division_id);
-    return null;
-  }
-  if (status === 'Pending_Manager') {
-    return getDivisionManager(app.division_id);
-  }
-  if (status === 'Pending_Director') {
-    return getDirector();
-  }
-  return null;
-}
-
-async function getSupervisorOrDelegate(applicantId) {
-  const { rows } = await pool.query(
-    'SELECT reports_to_id, division_id FROM users WHERE id = $1',
-    [applicantId]
-  );
-  const reportsToId = rows[0]?.reports_to_id;
-  if (!reportsToId) return null;
-  const today = new Date().toISOString().slice(0, 10);
-  const { rows: del } = await pool.query(
-    `SELECT d.delegatee_id FROM delegations d
-     WHERE d.delegator_id = $1 AND d.is_active = true AND $2::date BETWEEN d.start_date AND d.end_date`,
-    [reportsToId, today]
-  );
-  const notifyUserId = del.length ? del[0].delegatee_id : reportsToId;
-  const { rows: u } = await pool.query('SELECT id, email FROM users WHERE id = $1', [notifyUserId]);
-  return u[0] ? { userId: u[0].id, email: u[0].email } : null;
-}
-
-async function getDivisionManager(divisionId) {
-  const { rows } = await pool.query(
-    `SELECT u.id, u.email FROM users u
+    `SELECT u.id AS "userId", u.email
+     FROM users u
      JOIN user_roles ur ON u.id = ur.user_id
-     WHERE u.division_id = $1 AND ur.role_id = 3
-     LIMIT 1`,
-    [divisionId]
+     WHERE ur.role_id = $1`,
+    [roleId]
   );
-  return rows[0] ? { userId: rows[0].id, email: rows[0].email } : null;
-}
-
-async function getDirector() {
-  const { rows } = await pool.query(
-    `SELECT u.id, u.email FROM users u
-     JOIN user_roles ur ON u.id = ur.user_id
-     WHERE ur.role_id = 4
-     LIMIT 1`
-  );
-  return rows[0] ? { userId: rows[0].id, email: rows[0].email } : null;
-}
-
-/**
- * Notify the applicant (in-app + email) e.g. when leave is approved or disapproved.
- * @param {number} applicationId
- * @param {string} title
- * @param {string} body
- */
-export async function notifyApplicant(applicationId, title, body) {
-  const { rows } = await pool.query(
-    'SELECT id, email FROM users WHERE id = (SELECT applicant_id FROM leave_applications WHERE id = $1)',
-    [applicationId]
-  );
-  if (!rows.length) return;
-  const { id: userId, email } = rows[0];
-  await notifyUser({
-    userId,
-    leaveApplicationId: applicationId,
-    title,
-    body,
-    sendEmailTo: email || null,
-  });
+  return rows;
 }

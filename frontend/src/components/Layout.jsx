@@ -1,7 +1,7 @@
 /**
  * Author: Igor Michel
- * Purpose: Provide app shell layout, sidebar navigation, and global footer.
- * Last updated: 2026-02-09
+ * Purpose: Provide app shell layout, sidebar navigation, and global footer for LPODesk.
+ * Last updated: 2026-03-11
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
@@ -12,11 +12,10 @@ import TopBanner from './TopBanner';
 const ROUTE_TITLES = {
   '/': 'Dashboard',
   '/profile': 'My Profile',
-  '/apply': 'New application',
-  '/overtime': 'Overtime & TOIL',
+  '/requests/new': 'New Request',
+  '/requests': 'My Requests',
+  '/approvals': 'Pending Approvals',
   '/faq': 'FAQ',
-  '/supervisor': 'Approvals',
-  '/director': 'Director',
   '/settings': 'Settings',
 };
 
@@ -42,8 +41,8 @@ export default function Layout() {
     const base = getAppName();
     const path = location.pathname;
     let title = ROUTE_TITLES[path];
-    if (!title && path.startsWith('/application/')) title = 'Application';
-    document.title = title ? `${title}${base ? ` · ${base}` : ''}` : base || 'Leave application';
+    if (!title && path.startsWith('/requests/')) title = 'Request Details';
+    document.title = title ? `${title}${base ? ` · ${base}` : ''}` : base || 'LPODesk';
   }, [location.pathname]);
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
@@ -57,6 +56,8 @@ export default function Layout() {
     logout();
     navigate('/login');
   };
+
+  const isApprover = hasRole([ROLE_IDS.Manager, ROLE_IDS.ICTManager, ROLE_IDS.Procurement, ROLE_IDS.Director]);
 
   return (
     <div className={`app-shell${menuOpen ? ' menu-open' : ''}`}>
@@ -101,27 +102,19 @@ export default function Layout() {
               </NavLink>
               <NavLink to="/profile" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
                 <span className="nav-icon">👤</span> My Profile
-                {!user?.has_signature && (
-                  <span title="Signature not registered" style={{ marginLeft: 6, color: '#e0a000', fontWeight: 700, fontSize: '0.8rem' }}>⚠</span>
-                )}
               </NavLink>
-              <NavLink to="/apply" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-                <span className="nav-icon">📝</span> New application
+              <NavLink to="/requests/new" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+                <span className="nav-icon">📝</span> New Request
               </NavLink>
-              <NavLink to="/overtime" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-                <span className="nav-icon">⏱️</span> Overtime & TOIL
+              <NavLink to="/requests" end className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+                <span className="nav-icon">📋</span> My Requests
               </NavLink>
               <NavLink to="/faq" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
                 <span className="nav-icon">❓</span> FAQ
               </NavLink>
-              {hasRole([ROLE_IDS.PSO, ROLE_IDS.Manager]) && (
-                <NavLink to="/supervisor" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+              {isApprover && (
+                <NavLink to="/approvals" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
                   <span className="nav-icon">✔️</span> Approvals
-                </NavLink>
-              )}
-              {hasRole(ROLE_IDS.Director) && (
-                <NavLink to="/director" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-                  <span className="nav-icon">👑</span> Director
                 </NavLink>
               )}
               {hasRole(ROLE_IDS.Admin) && (
@@ -133,7 +126,6 @@ export default function Layout() {
             <div className="app-nav-user">
               <NavLink to="/profile" className="app-user" title="My Profile">
                 {user?.full_name}
-                {!user?.has_signature && <span style={{ marginLeft: 5, color: '#e0a000' }}>⚠</span>}
               </NavLink>
               <button type="button" className="nav-logout" onClick={handleLogout}>
                 Logout

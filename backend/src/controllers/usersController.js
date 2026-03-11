@@ -559,8 +559,8 @@ export async function testSmtp(req, res) {
     await transporter.sendMail({
       from,
       to: toEmail,
-      subject: 'VMGD Leave System – SMTP test',
-      text: 'This is a test email from the VMGD Leave backend. If you received this, SMTP is working.',
+      subject: 'LPODesk – SMTP test',
+      text: 'This is a test email from the LPODesk backend. If you received this, SMTP is working.',
     });
     res.json({ ok: true, message: 'Test email sent to ' + toEmail });
   } catch (err) {

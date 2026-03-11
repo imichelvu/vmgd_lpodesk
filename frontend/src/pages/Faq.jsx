@@ -1,231 +1,160 @@
 /**
  * Author: Igor Michel
- * Purpose: Provide a user-facing FAQ covering leave, overtime, signatures, and PSSRM rules.
- * Last updated: 2026-03-09
+ * Purpose: Provide a user-facing FAQ covering procurement requests, approvals, and LPODesk usage.
+ * Last updated: 2026-03-11
  */
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 
 const SECTIONS = [
   {
-    title: '🖊 Signature',
+    title: '📝 Submitting a Request',
     items: [
       {
-        q: 'Why do I need to register a signature?',
-        a: `Your registered signature is applied automatically to PSC Form 4-9 whenever you submit a leave application or an approver approves/disapproves. Without a registered signature you cannot submit or approve anything. Go to My Profile to draw and save your signature — you only need to do this once.`,
+        q: 'How do I create a new procurement request?',
+        a: 'Click "New Request" in the sidebar. Fill in the title, description, supplier name, estimated amount, and select a category. Attach a supplier quote or specification document if available. You can save it as a draft or submit it for approval immediately.',
       },
       {
-        q: 'How do I register or update my signature?',
-        a: `Click My Profile in the left sidebar. Under "Registered Signature", draw your signature using your mouse or touchscreen and click Save. You can update it at any time by drawing a new one and clicking "Save new signature". A ⚠ warning icon will appear next to your name in the sidebar until a signature is registered.`,
+        q: 'What categories are available?',
+        a: 'ICT Equipment · Office Supplies · Services · Maintenance · Consultancy. If your item does not fit neatly into one category, choose the closest match and describe it clearly in the description field.',
       },
       {
-        q: 'Can I use a different signature for approvals than for applications?',
-        a: `No. One registered signature is used everywhere — leave applications, approvals, and the printed PSC Form 4-9. This ensures consistency and prevents fraud. If you need to update your signature, go to My Profile.`,
+        q: 'What is the difference between "Save as Draft" and "Submit for Approval"?',
+        a: 'A draft is only visible to you and can be edited before submission. Once you submit, the request enters the approval workflow and can no longer be edited. Use drafts when you need to gather more information before sending it forward.',
+      },
+      {
+        q: 'Can I attach multiple documents to one request?',
+        a: 'Yes. After the request is created, additional documents can be uploaded from the request details page. Supported formats are PDF, Word, Excel, and common image types (JPG, PNG). Maximum file size is 10 MB per file.',
       },
     ],
   },
   {
-    title: '📝 Leave Applications',
+    title: '🔄 Approval Workflow',
     items: [
       {
-        q: 'How do I submit a leave application?',
-        a: `Go to New Application in the sidebar. Complete all required fields on PSC Form 4-9: leave type, destination, start date, end date, and total working days. Your registered signature is applied automatically. Click Submit. The form is forwarded to your immediate superior (PSO or Manager) for approval.`,
+        q: 'What is the approval chain for a procurement request?',
+        a: 'All requests go through: Manager → Procurement Officer → Director. If the category is ICT Equipment, an additional ICT Manager approval step is inserted between Manager and Procurement Officer.',
       },
       {
-        q: 'How is "Total working days" calculated?',
-        a: `For full-day leave: the system counts working days (Monday–Friday) between your start and end dates, excluding weekends. For Date & time range (partial days): the system calculates elapsed hours using an 8-hour workday (08:00–17:00 excluding 1-hour lunch) and converts to a decimal day value (e.g., 4 hours = 0.5 days). All values are rounded to 1 decimal place.`,
-      },
-      {
-        q: 'What is "Date & time range" leave?',
-        a: `Use this option when taking less than a full day — for example, a half-day, 1.5 days, or a specific time window. You enter exact start and end date/time, and the system calculates the total automatically (e.g., Tuesday 08:00 to Wednesday 12:00 = 1.5 days).`,
-      },
-      {
-        q: 'How much advance notice is required for leave?',
-        a: `Per PSSRM, leave requests must be submitted at least 2 weeks in advance of the proposed start date. The system will block submission if the notice period is insufficient. Emergency leave types (Sick, Compassionate, Family) are exempt from this requirement.`,
-      },
-      {
-        q: 'What leave types are available?',
-        a: `Annual vacation · Home island · Sick leave · Maternity · Family · Compassionate · Sporting / Cultural / Religious · Leave without pay · Other. Annual vacation accrues at 1.25 days per month for employees with less than 6 years of service, and 1.75 days per month after 6 years.`,
-      },
-      {
-        q: 'When can I print the approved form?',
-        a: `Once your application is fully Approved by the Director, open the application from your dashboard and click "Printable full form". The A4 form shows all filled fields and all signatures overlaid on the official PSC Form 4-9.`,
+        q: 'Why does my ICT Equipment request have an extra approval step?',
+        a: 'ICT Equipment requests require technical validation from the ICT Manager before they proceed to Procurement. This ensures that specifications are correct and compatible with existing infrastructure before a purchase order is issued.',
       },
       {
         q: 'What do the status labels mean?',
-        a: (
-          <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem', lineHeight: '1.9' }}>
-            <li><strong>Pending Superior</strong> — waiting for your PSO or Manager to act</li>
-            <li><strong>Pending Director</strong> — waiting for the Director to give final sign-off</li>
-            <li><strong>Approved</strong> — fully approved; you may proceed with your leave</li>
-            <li><strong>Disapproved</strong> — rejected; a comment explaining the reason is attached</li>
-          </ul>
-        ),
+        a: [
+          'draft — saved but not yet submitted.',
+          'submitted — sent to the Manager for first review.',
+          'manager_approved — Manager has approved; moving to ICT Manager (ICT) or Procurement (other).',
+          'ict_approved — ICT Manager has validated; moving to Procurement Officer.',
+          'procurement_approved — Procurement Officer has approved; moving to Director.',
+          'director_approved / completed — fully approved, LPO can be issued.',
+          'rejected — refused at some stage; a comment explaining the reason should be present.',
+        ].join(' | '),
       },
       {
-        q: 'Why is my application blocked at submission?',
-        a: `Two checks run at submission: (1) Insufficient leave balance — you do not have enough days available for this leave type in the current year. (2) Advance notice — you have not submitted at least 2 weeks before the start date. Check your Leave balances on the dashboard and adjust your dates accordingly.`,
+        q: 'Can I approve a request that I created myself?',
+        a: 'No. The workflow checks are role-based, not request-owner-based at the database level, but approvers should not act on requests they created. Self-approval would constitute a conflict of interest under procurement regulations.',
+      },
+      {
+        q: 'What happens when I reject a request?',
+        a: 'The request status changes to "rejected" and the requester receives an email notification with your comment. A rejected request cannot be resubmitted — the requester must create a new request if they wish to try again.',
       },
     ],
   },
   {
-    title: '✅ Approval Workflow',
+    title: '👤 Roles and Permissions',
     items: [
       {
-        q: 'Who approves my leave application?',
-        a: `Your application first goes to your immediate superior (PSO or Division Manager). Once they approve it, it moves to the Director for final sign-off. Both stages are required before the status becomes Approved. Email notifications are sent at each stage.`,
+        q: 'Who can submit a request?',
+        a: 'Any staff member with an active LPODesk account can create and submit procurement requests.',
       },
       {
-        q: 'How does the system know who my supervisor is?',
-        a: `Your "Reports to" field in Admin → Users links you to your supervisor. If your applications are not reaching the right person, contact your Admin to verify this mapping.`,
+        q: 'Who can approve requests?',
+        a: 'Manager (role 3) approves first. ICT Manager (role 6) approves ICT Equipment requests next. Procurement Officer (role 7) approves after ICT validation or directly after Manager for non-ICT requests. Director (role 4) gives final approval.',
       },
       {
-        q: 'Can a manager approve on behalf of someone who is on leave (delegation)?',
-        a: `Yes. If a delegation is active, the acting manager will see the applications in their approval queue marked with "(Acting for [Name])". Delegation periods are managed by Admin.`,
+        q: 'Can a user have more than one role?',
+        a: 'Yes. A user can hold multiple roles simultaneously — for example, a user could be both a Staff member and a Manager. Roles are assigned by the Admin in Settings.',
       },
       {
-        q: 'Can I approve my own leave application?',
-        a: `No. The system prevents self-approval. Even if you hold a manager or director role, you cannot approve applications you submitted yourself.`,
-      },
-      {
-        q: 'What happens after I disapprove an application?',
-        a: `A comment is mandatory when disapproving. The applicant is notified by email with the status change and your comment. The application status becomes Disapproved and no further action is needed.`,
+        q: 'What can the Admin do that other users cannot?',
+        a: 'Admins can manage all users, assign roles, manage divisions, set up acting delegations, and configure system-wide settings. Admins can also view all requests in the system regardless of status.',
       },
     ],
   },
   {
-    title: '⏱ Overtime & TOIL',
+    title: '📁 Documents',
     items: [
       {
-        q: 'What are the standard hours of work?',
-        a: `The standard working week in the public service is 40 hours — 08:00–12:00 and 13:00–17:00, Monday to Friday (with a 1-hour unpaid lunch break). Any variation to these hours requires prior written consent from your Director-General, Director, Secretary, or equivalent position, and the Secretary must be notified of any such variation.`,
+        q: 'What types of documents should I attach?',
+        a: 'Supplier quotations are required for most procurements. For ICT requests, include technical specifications. For services, attach a scope of work or terms of reference. For maintenance, include a description of the work and cost estimate.',
       },
       {
-        q: 'What qualifies as overtime under the PSSRM?',
-        a: `Overtime means hours worked beyond the standard monthly hours (working days in the calendar month × 8 hours per day). You must work a minimum of 1 full hour beyond the standard hours in a single working day to qualify. You must also be directed in writing by your supervisor before performing the overtime work — no claim is payable for self-directed overtime.`,
-      },
-      {
-        q: 'What are the overtime entitlements by grade?',
-        a: (
-          <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem', lineHeight: '1.9' }}>
-            <li><strong>PS1.1 – PS6.4 (and equivalents):</strong> Eligible for overtime <em>payment</em> OR Time Off In Lieu (TOIL) at <strong>1¼ hours off per hour worked</strong></li>
-            <li><strong>PS7.1 and above (and equivalents):</strong> TOIL only (not eligible for overtime payment), also at <strong>1¼ hours off per hour worked</strong></li>
-            <li>TOIL must be taken within <strong>3 months</strong> of the approved date, and every effort should be made to take it within the same financial year</li>
-            <li>All overtime claims must be settled before the end of the same financial year</li>
-            <li>Failing to comply is a disciplinary offence under PSSRM Chapter 6</li>
-          </ul>
-        ),
-      },
-      {
-        q: 'What is required before claiming overtime?',
-        a: (
-          <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem', lineHeight: '1.9' }}>
-            <li>Written direction from your supervisor to work overtime (before the work is performed)</li>
-            <li>PSC Form 4-2 completed and endorsed by your immediate supervisor <em>and</em> Director / Director-General / Secretary or equivalent</li>
-            <li>A timesheet to verify actual hours worked</li>
-            <li>Overtime must be settled within the same financial year; claims submitted after year-end cannot be paid</li>
-            <li>No payment is made for any overtime worked without prior written approval</li>
-          </ul>
-        ),
-      },
-      {
-        q: 'What are unsocial hours?',
-        a: `Under PSSRM s.4.1 Unsocial Hours Payments, "unsocial hours bandwidth" means 08:00–17:00 on Saturdays, Sundays, and Official Public Holidays. Weekday evenings are not classified as unsocial hours. Staff on PS1.1–PS6.4 (and daily-rated workers) are entitled to an additional unsocial hours payment on top of their ordinary rate or overtime rate for work performed during this window — but only when directed by a supervisor.`,
-      },
-      {
-        q: 'What overtime types can I record in the system?',
-        a: (
-          <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem', lineHeight: '1.9' }}>
-            <li><strong>Weekend / Field Work</strong> — worked on weekends or during local field trips (unsocial hours apply)</li>
-            <li><strong>Emergency Callout</strong> — called in to fix server, workstation, or power issues outside standard hours</li>
-            <li><strong>Standby Duty</strong> — on standby for Tropical Low / Cyclone events or operational alerts</li>
-            <li><strong>Overseas Mission</strong> — international travel, training, conferences, or meetings outside the country</li>
-            <li><strong>General Overtime</strong> — all other extra work performed beyond standard weekday hours</li>
-          </ul>
-        ),
-      },
-      {
-        q: 'How do I account for break time within an overtime window?',
-        a: `When adding an overtime entry, fill in the Start and End date/time for the full window (e.g., Saturday 08:00–17:00). Then enter any Break / deduction hours (e.g., 1.0 for a lunch break). The system calculates: Elapsed − Break = Net worked hours. Only the net hours count toward your overtime entitlement and TOIL calculation.`,
-      },
-      {
-        q: 'How does lateness affect my overtime entitlement?',
-        a: `Per PSSRM s.63, if you arrive 1 or more hours late without permission, you are required to make up those lost hours. Make-up hours owed reduce your net claimable overtime. Example: you worked 3 hours overtime on a day you were 1 hour late → net claimable overtime = 2 hours → TOIL = 2 × 1.25 = 2.5 hours. Lateness of less than 1 hour does not trigger the make-up rule.`,
-      },
-      {
-        q: 'What happens with accumulated lateness?',
-        a: (
-          <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem', lineHeight: '1.9' }}>
-            <li>Each late arrival of ≥1 hour (without permission) must be made up</li>
-            <li>Accumulated lateness of <strong>8 hours total</strong> = 1 absence incident</li>
-            <li><strong>3 or more absence incidents</strong> in any 6-month period → supervisor must conduct a counselling session</li>
-            <li><strong>10 or more absence incidents</strong> → disciplinary offence under PSSRM</li>
-          </ul>
-        ),
+        q: 'Where are uploaded documents stored?',
+        a: 'Documents are stored securely on the server and linked to your request. They are visible to all users who can view the request, including all approvers in the chain.',
       },
     ],
   },
   {
-    title: '📊 Leave Balances',
+    title: '⚙️ Account and Access',
     items: [
-      {
-        q: 'How does annual leave accrue?',
-        a: `Annual vacation accrues monthly: 1.25 days per month for employees with less than 6 years of service, and 1.75 days per month for those with 6 or more years of continuous service — in accordance with Employment Act [Cap 160] (Vanuatu). Balances are shown on your dashboard.`,
-      },
-      {
-        q: 'Can I check my leave balance before applying?',
-        a: `Yes. Your current leave balances for each leave type and year are shown on the Dashboard under "Leave balances". The system will also block your application at submission if you have insufficient balance.`,
-      },
-    ],
-  },
-  {
-    title: '👤 Account & Profile',
-    items: [
-      {
-        q: 'How do I log in?',
-        a: `Enter your username (e.g., jdoe) or your email address, along with your password, on the login page. Contact Admin if you do not know your credentials.`,
-      },
       {
         q: 'How do I reset my password?',
-        a: `Click "Forgot password?" on the login page and enter your registered email. You will receive a reset link valid for 1 hour.`,
+        a: 'On the login page click "Forgot password". Enter your email address and a reset link will be sent to you. The link is valid for 1 hour. If you do not receive an email, check your spam folder or contact Admin.',
       },
       {
-        q: 'Can I update my own profile (name, division, grade)?',
-        a: `Personal details such as name, division, grade, and ministry are managed by Admin. Go to Admin → Users to request a change, or contact your HR Admin. You can manage your own signature on the My Profile page.`,
+        q: 'I cannot log in. What should I check?',
+        a: 'Make sure you are using your correct username or email. Passwords are case-sensitive. If you have forgotten your password, use the Forgot Password link. If your account may have been deactivated, contact Admin.',
       },
       {
-        q: 'Who do I contact if I have access or role issues?',
-        a: `Contact your Admin user or HR. Common issues: account not activated, wrong division assignment, missing supervisor link (reports_to_id), or incorrect role mapping. All of these are managed in Admin → Users.`,
+        q: 'How do I update my profile information?',
+        a: 'Go to "My Profile" in the sidebar. You can update your post title, department, and ministry details. Contact your Admin to change your name, email, division, or role assignments.',
       },
     ],
   },
 ];
 
+function FaqItem({ q, a }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="faq-item" style={{ borderBottom: '1px solid var(--border, #e5e7eb)' }}>
+      <button
+        type="button"
+        className="faq-question"
+        style={{
+          width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer',
+          padding: '0.9rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          fontWeight: 600, fontSize: '0.95rem', color: 'var(--text, #111827)',
+        }}
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+      >
+        {q}
+        <span style={{ marginLeft: '1rem', fontSize: '1.1rem', flexShrink: 0, color: 'var(--text-muted, #6b7280)' }}>
+          {open ? '▲' : '▼'}
+        </span>
+      </button>
+      {open && (
+        <div className="faq-answer" style={{ padding: '0 0 0.9rem', color: 'var(--text-secondary, #374151)', lineHeight: 1.7, fontSize: '0.9rem' }}>
+          {a}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FaqSection({ title, items }) {
   return (
-    <div className="card" style={{ marginBottom: '1.25rem' }}>
-      <h2 style={{ margin: '0 0 1rem', fontSize: '1rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-        {title}
-      </h2>
-      <div className="faq-list" role="list">
-        {items.map((item) => (
-          <details key={item.q} className="faq-item" role="listitem">
-            <summary className="faq-question">{item.q}</summary>
-            <div className="faq-answer">
-              {typeof item.a === 'string' ? <p style={{ margin: 0 }}>{item.a}</p> : item.a}
-            </div>
-          </details>
-        ))}
-      </div>
+    <div className="card" style={{ marginBottom: '1rem' }}>
+      <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.25rem' }}>{title}</h2>
+      {items.map((item) => <FaqItem key={item.q} q={item.q} a={item.a} />)}
     </div>
   );
 }
 
 export default function Faq() {
   const [search, setSearch] = useState('');
-  const q = search.toLowerCase().trim();
-
+  const q = search.trim().toLowerCase();
   const filtered = q
     ? SECTIONS.map((s) => ({
         ...s,
@@ -238,10 +167,10 @@ export default function Faq() {
     : SECTIONS;
 
   return (
-    <>
+    <div className="page-content">
       <PageHeader
         title="Frequently Asked Questions"
-        subtitle="Quick answers for staff and approvers using LeaveDesk."
+        subtitle="Quick answers for staff and approvers using LPODesk."
       />
 
       <div className="card" style={{ marginBottom: '1.25rem' }}>
@@ -250,9 +179,10 @@ export default function Faq() {
           <input
             id="faq-search"
             type="search"
+            className="form-control"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="e.g. overtime, signature, balance, lateness…"
+            placeholder="e.g. ICT, approval, document, category…"
             autoComplete="off"
           />
         </div>
@@ -260,7 +190,7 @@ export default function Faq() {
 
       {filtered.length === 0 && (
         <div className="card">
-          <p className="text-muted">No matching questions found for "<strong>{search}</strong>". Try a different keyword.</p>
+          <p className="muted">No matching questions found for &ldquo;<strong>{search}</strong>&rdquo;. Try a different keyword.</p>
         </div>
       )}
 
@@ -269,12 +199,10 @@ export default function Faq() {
       ))}
 
       <div className="card" style={{ marginTop: '1rem' }}>
-        <p className="text-muted" style={{ margin: 0, fontSize: '0.85rem' }}>
-          Still have questions? Contact your Admin in the{' '}
-          <Link to="/admin">Admin panel</Link>{' '}
-          or email HR. For full policy details, refer to the PSSRM: Chapter 3 (Hours of Work) and Chapter 4 (Work Related Allowances — Overtime s.4.1, Unsocial Hours s.4.1).
+        <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+          Still have questions? Contact your system administrator or the Procurement Unit.
         </p>
       </div>
-    </>
+    </div>
   );
 }

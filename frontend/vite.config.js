@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
 
   build: {
-    // Production output served by nginx at /var/www/leavedesk/dist
+    // Production output served by nginx at /var/www/lpodesk/dist
     outDir: 'dist',
     sourcemap: false,
   },
@@ -14,7 +14,7 @@ export default defineConfig({
     // Local dev server
     port: 5173,
     host: true,
-    allowedHosts: ['leavedesk.vmgd.gov.vu', '6a14-202-80-43-49.ngrok-free.app'],
+    allowedHosts: ['lpodesk.vmgd.gov.vu', '6a14-202-80-43-49.ngrok-free.app'],
     proxy: {
       // Dev only — in production nginx proxies /api/* to the backend
       '/api': {

@@ -12,9 +12,6 @@ import UsersTable from '../components/admin/UsersTable';
 import UsersPagination from '../components/admin/UsersPagination';
 import UserFormModal from '../components/admin/UserFormModal';
 import DelegationManagement from '../components/admin/DelegationManagement';
-import UserBalanceManagement from '../components/admin/UserBalanceManagement';
-import LeavePolicyManagement from '../components/admin/LeavePolicyManagement';
-import AppSettingsPanel from '../components/admin/AppSettingsPanel';
 
 const emptyUserForm = (defaultRoleId) => ({
   full_name: '',
@@ -50,8 +47,6 @@ export default function AdminView() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [resendResult, setResendResult] = useState(null);
-  const [resendLoading, setResendLoading] = useState(false);
   const [adModalOpen, setAdModalOpen] = useState(false);
   const [adUsername, setAdUsername] = useState('');
   const [adPassword, setAdPassword] = useState('');
@@ -70,7 +65,6 @@ export default function AdminView() {
   const [divisionFilter, setDivisionFilter] = useState('');
   const [usersSearch, setUsersSearch] = useState('');
   const [selectedUserIds, setSelectedUserIds] = useState(new Set());
-  const [selectedUserForBalances, setSelectedUserForBalances] = useState(null);
 
   const loadUsers = useCallback((page = 1, divisionIdOverride = undefined, searchOverride = undefined) => {
     setUsersLoading(true);
@@ -246,23 +240,6 @@ export default function AdminView() {
     }
   };
 
-  const handleResendPendingEmails = async () => {
-    setError('');
-    setResendResult(null);
-    setResendLoading(true);
-    try {
-      const data = await request('/leave/resend-pending-notifications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      setResendResult(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setResendLoading(false);
-    }
-  };
 
   const openAdModal = useCallback(() => {
     setAdModalOpen(true);
@@ -369,36 +346,20 @@ export default function AdminView() {
     }
   };
 
-  const openUserBalanceManagement = useCallback((user) => {
-    setSelectedUserForBalances(user);
-    setTab('balanceManagement');
-  }, []);
 
   return (
     <>
       <PageHeader
         title="Settings"
-        subtitle="Oversee users, roles, divisions, leave balances, policies, delegations, and TOIL rules for all system administration."
+        subtitle="Manage users, roles, divisions, delegations, and system settings for LPODesk."
       />
 
       <div className="tabs">
         <button type="button" className={`tab ${tab === 'users' ? 'active' : ''}`} onClick={() => setTab('users')}>
-          Users & roles
+          Users &amp; roles
         </button>
         <button type="button" className={`tab ${tab === 'delegations' ? 'active' : ''}`} onClick={() => setTab('delegations')}>
           Delegation tool
-        </button>
-        <button type="button" className={`tab ${tab === 'balanceManagement' ? 'active' : ''}`} onClick={() => setTab('balanceManagement')} disabled={!selectedUserForBalances}>
-          Balance Management {selectedUserForBalances ? `(${selectedUserForBalances.full_name})` : ''}
-        </button>
-        <button type="button" className={`tab ${tab === 'leavePolicies' ? 'active' : ''}`} onClick={() => setTab('leavePolicies')}>
-          Leave Policies
-        </button>
-        <button type="button" className={`tab ${tab === 'toilRules' ? 'active' : ''}`} onClick={() => setTab('toilRules')}>
-          TOIL Rules
-        </button>
-        <button type="button" className={`tab ${tab === 'notifications' ? 'active' : ''}`} onClick={() => setTab('notifications')}>
-          Notifications
         </button>
       </div>
 
@@ -450,7 +411,7 @@ export default function AdminView() {
             onClearSelection={clearUserSelection}
             onEditUser={openEditUser}
             onDeleteUser={(u) => setDeleteConfirm({ type: 'single', id: u.id, full_name: u.full_name })}
-            onManageBalances={openUserBalanceManagement}
+            onManageBalances={null}
           />
 
           <UsersPagination
@@ -613,8 +574,8 @@ export default function AdminView() {
         open={Boolean(deleteConfirm)}
         title={deleteConfirm?.type === 'single' ? 'Confirm delete' : 'Confirm bulk delete'}
         message={deleteConfirm?.type === 'single'
-          ? <>Delete user <strong>{deleteConfirm.full_name}</strong>? This will remove their leave applications and cannot be undone.</>
-          : <>Delete <strong>{deleteConfirm?.count ?? 0}</strong> user(s)? This will remove their leave applications and cannot be undone.</>
+          ? <>Delete user <strong>{deleteConfirm.full_name}</strong>? This will remove their procurement requests and cannot be undone.</>
+          : <>Delete <strong>{deleteConfirm?.count ?? 0}</strong> user(s)? This will remove their procurement requests and cannot be undone.</>
         }
         confirmText={deleteConfirm?.type === 'single' ? 'Delete' : `Delete ${deleteConfirm?.count ?? 0} user(s)`}
         onClose={() => setDeleteConfirm(null)}
@@ -647,54 +608,6 @@ export default function AdminView() {
         />
       )}
 
-      {tab === 'balanceManagement' && selectedUserForBalances && (
-        <div className="card">
-          <h3 className="section-title">Leave Balances for {selectedUserForBalances.full_name} ({selectedUserForBalances.email})</h3>
-          <UserBalanceManagement
-            userId={selectedUserForBalances.id}
-            onError={setError}
-          />
-        </div>
-      )}
-
-      {tab === 'leavePolicies' && (
-        <LeavePolicyManagement
-          onError={setError}
-        />
-      )}
-
-      {tab === 'toilRules' && (
-        <AppSettingsPanel onError={setError} />
-      )}
-
-      {tab === 'notifications' && (
-        <div className="card">
-          <h2 className="card-title">Pending leave notifications</h2>
-          <p className="card-subtitle" style={{ marginTop: '0.25rem', marginBottom: '1rem' }}>
-            Send (or resend) approval emails for all leave applications still waiting on PSO, Manager, or Director.
-            Use this if emails were missed when applications were originally submitted.
-          </p>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleResendPendingEmails}
-            loading={resendLoading}
-            loadingText="Sending…"
-          >
-            Send emails for pending approvals
-          </Button>
-          {resendResult && (
-            <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: 'var(--bg-subtle)', borderRadius: 8, border: '1px solid var(--border)' }}>
-              <p style={{ margin: 0, fontWeight: 600 }}>{resendResult.message}</p>
-              {resendResult.details?.length > 0 && (
-                <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                  {resendResult.details.map((line, i) => <li key={i}>{line}</li>)}
-                </ul>
-              )}
-            </div>
-          )}
-        </div>
-      )}
     </>
   );
 }

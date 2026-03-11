@@ -1,5 +1,5 @@
--- VMGD Online Leave System - PostgreSQL Schema
--- Role IDs: 1=Staff, 2=PSO, 3=Manager, 4=Director, 5=Admin
+-- LPODesk - Local Purchase Order Request Workflow - PostgreSQL Schema
+-- Role IDs: 1=Staff, 2=PSO, 3=Manager, 4=Director, 5=Admin, 6=ICT Manager, 7=Procurement Officer
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
@@ -93,140 +93,76 @@ CREATE TRIGGER delegations_updated_at
   BEFORE UPDATE ON delegations
   FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
 
--- leave balance policies (defaults per leave type)
-CREATE TABLE IF NOT EXISTS leave_balance_policies (
-  leave_type VARCHAR(100) PRIMARY KEY,
-  default_allocation_days DECIMAL(7,2) NOT NULL DEFAULT 0,
-  requires_balance BOOLEAN NOT NULL DEFAULT true,
-  allow_negative BOOLEAN NOT NULL DEFAULT false,
-  min_notice_days INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+-- (Leave management tables removed — this is LPODesk, not LeaveDesk)
 
-CREATE TRIGGER leave_balance_policies_updated_at
-  BEFORE UPDATE ON leave_balance_policies
-  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
 
-INSERT INTO leave_balance_policies (leave_type, default_allocation_days, requires_balance, allow_negative, min_notice_days) VALUES
-  ('Annual vacation', 0, true, false, 14),
-  ('Home island', 10, true, false, 14),
-  ('Sick leave', 21, true, false, 0),
-  ('Maternity', 90, true, false, 14),
-  ('Family', 5, true, false, 14),
-  ('Compassionate', 5, true, false, 0),
-  ('Sporting / Cultural / Religious', 5, true, false, 14),
-  ('Leave without pay', 0, false, true, 14),
-  ('Other', 0, false, true, 14)
-ON CONFLICT (leave_type) DO NOTHING;
-
--- monthly accrual tiers (section 29 rules configurable by years of service)
-CREATE TABLE IF NOT EXISTS leave_accrual_tiers (
-  leave_type VARCHAR(100) NOT NULL,
-  min_years INTEGER NOT NULL,
-  monthly_days DECIMAL(6,3) NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (leave_type, min_years),
-  CONSTRAINT leave_accrual_tiers_non_negative CHECK (min_years >= 0 AND monthly_days >= 0)
-);
-
-CREATE TRIGGER leave_accrual_tiers_updated_at
-  BEFORE UPDATE ON leave_accrual_tiers
-  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
-
-INSERT INTO leave_accrual_tiers (leave_type, min_years, monthly_days) VALUES
-  ('Annual vacation', 0, 1.25),
-  ('Annual vacation', 6, 1.75)
-ON CONFLICT (leave_type, min_years) DO NOTHING;
-
--- leave balances per user/year/type
-CREATE TABLE IF NOT EXISTS leave_balances (
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  leave_type VARCHAR(100) NOT NULL REFERENCES leave_balance_policies(leave_type) ON DELETE RESTRICT,
-  year INTEGER NOT NULL,
-  allocated_days DECIMAL(7,2) NOT NULL DEFAULT 0,
-  carry_forward_days DECIMAL(7,2) NOT NULL DEFAULT 0,
-  used_days DECIMAL(7,2) NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (user_id, leave_type, year)
-);
-
-CREATE TRIGGER leave_balances_updated_at
-  BEFORE UPDATE ON leave_balances
-  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
-
--- overtime entries (staff extra hours for payment or TOIL)
-CREATE TABLE IF NOT EXISTS overtime_entries (
+-- requests: core procurement request table
+CREATE TABLE IF NOT EXISTS requests (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  start_datetime TIMESTAMPTZ,
-  end_datetime TIMESTAMPTZ,
-  work_date DATE NOT NULL,
-  hours DECIMAL(5,2) NOT NULL CHECK (hours > 0 AND hours <= 24),
-  overtime_type VARCHAR(100) NOT NULL DEFAULT 'General Overtime'
-    CHECK (overtime_type IN ('Weekend / Field Work', 'Emergency Callout', 'Standby Duty', 'Overseas Mission', 'General Overtime')),
-  purpose VARCHAR(30) NOT NULL
-    CHECK (purpose IN ('Overtime Payment', 'Time Off In Lieu')),
-  remarks TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT overtime_entries_valid_range CHECK (
-    start_datetime IS NULL
-    OR end_datetime IS NULL
-    OR end_datetime > start_datetime
-  )
+  title TEXT NOT NULL,
+  description TEXT,
+  supplier_name TEXT,
+  amount NUMERIC(15,2),
+  category TEXT NOT NULL,
+  payment_type TEXT NOT NULL DEFAULT 'LPO'
+    CHECK (payment_type IN ('LPO', 'Direct Payment')),
+  budget_type  TEXT
+    CHECK (budget_type IN ('Recurrent', 'Projects')),
+  quote_number TEXT,
+  status TEXT NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft','submitted','manager_approved','ict_approved','procurement_approved','director_approved','rejected','completed')),
+  created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER overtime_entries_updated_at
-  BEFORE UPDATE ON overtime_entries
+CREATE TRIGGER requests_updated_at
+  BEFORE UPDATE ON requests
   FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
 
--- leave_applications (PSC Form 4-9 fields)
-CREATE TABLE IF NOT EXISTS leave_applications (
+-- approvals: one row per approver decision per request
+CREATE TABLE IF NOT EXISTS approvals (
   id SERIAL PRIMARY KEY,
-  applicant_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  leave_type VARCHAR(100) NOT NULL,
-  destination VARCHAR(255),
-  start_date DATE NOT NULL,
-  end_date DATE NOT NULL,
-  is_half_day BOOLEAN NOT NULL DEFAULT false,
-  half_day_time_start TIME,
-  half_day_time_end TIME,
-  total_working_days DECIMAL(5,2) NOT NULL DEFAULT 0,
-  advance_pay BOOLEAN NOT NULL DEFAULT false,
-  advance_pay_date DATE,
-  reason_or_remarks TEXT,
-  status VARCHAR(50) NOT NULL DEFAULT 'Pending_PSO'
-    CHECK (status IN ('Pending_PSO', 'Pending_Manager', 'Pending_Director', 'Approved', 'Disapproved')),
-  pso_comment TEXT,
-  manager_comment TEXT,
-  director_comment TEXT,
-  signature_data JSONB,
-  approved_by_pso_id INTEGER REFERENCES users(id),
-  approved_by_manager_id INTEGER REFERENCES users(id),
-  approved_by_director_id INTEGER REFERENCES users(id),
-  pso_approved_at TIMESTAMPTZ,
-  manager_approved_at TIMESTAMPTZ,
-  director_approved_at TIMESTAMPTZ,
-  pso_signature_data TEXT,
-  manager_signature_data TEXT,
-  director_signature_data TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT valid_leave_dates CHECK (end_date >= start_date)
+  request_id INTEGER NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+  approver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL,
+  decision TEXT CHECK (decision IN ('approved','rejected')),
+  comment TEXT,
+  approved_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER leave_applications_updated_at
-  BEFORE UPDATE ON leave_applications
-  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+-- documents: uploaded supplier quotes / invoices / specs
+CREATE TABLE IF NOT EXISTS documents (
+  id SERIAL PRIMARY KEY,
+  request_id INTEGER NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+  file_name TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  mime_type TEXT,
+  uploaded_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
--- notifications (optional table for in-app + email)
+-- workflow_steps: defines the approval chain order and conditions
+CREATE TABLE IF NOT EXISTS workflow_steps (
+  id SERIAL PRIMARY KEY,
+  step_order INTEGER NOT NULL,
+  role TEXT NOT NULL,
+  condition TEXT
+);
+
+INSERT INTO workflow_steps (step_order, role, condition) VALUES
+  (1, 'manager', NULL),
+  (2, 'ict_manager', 'category=ICT Equipment'),
+  (3, 'procurement', NULL),
+  (4, 'director', NULL)
+ON CONFLICT DO NOTHING;
+
+-- notifications (in-app + email)
 CREATE TABLE IF NOT EXISTS notifications (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  leave_application_id INTEGER REFERENCES leave_applications(id) ON DELETE SET NULL,
+  request_id INTEGER REFERENCES requests(id) ON DELETE SET NULL,
   title VARCHAR(255) NOT NULL,
   body TEXT,
   read_at TIMESTAMPTZ,
@@ -250,14 +186,16 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires ON password_reset_tokens(expires_at);
 
--- Indexes for common queries
+-- Indexes
 CREATE INDEX IF NOT EXISTS idx_users_division ON users(division_id);
 CREATE INDEX IF NOT EXISTS idx_users_reports_to ON users(reports_to_id);
-CREATE INDEX IF NOT EXISTS idx_leave_applications_applicant ON leave_applications(applicant_id);
-CREATE INDEX IF NOT EXISTS idx_leave_applications_status ON leave_applications(status);
-CREATE INDEX IF NOT EXISTS idx_leave_applications_dates ON leave_applications(start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_delegations_dates ON delegations(start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_delegations_delegatee ON delegations(delegatee_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
-CREATE INDEX IF NOT EXISTS idx_leave_balances_user_year ON leave_balances(user_id, year);
-CREATE INDEX IF NOT EXISTS idx_overtime_entries_user_date ON overtime_entries(user_id, work_date DESC);
+CREATE INDEX IF NOT EXISTS idx_requests_created_by ON requests(created_by);
+CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status);
+CREATE INDEX IF NOT EXISTS idx_approvals_request ON approvals(request_id);
+CREATE INDEX IF NOT EXISTS idx_approvals_approver ON approvals(approver_id);
+CREATE INDEX IF NOT EXISTS idx_documents_request ON documents(request_id);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires ON password_reset_tokens(expires_at);

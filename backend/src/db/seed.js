@@ -2,7 +2,7 @@ import '../loadEnv.js';
 import bcrypt from 'bcryptjs';
 import pool from './pool.js';
 
-const ROLES = { Staff: 1, PSO: 2, Manager: 3, Director: 4, Admin: 5 };
+const ROLES = { Staff: 1, PSO: 2, Manager: 3, Director: 4, Admin: 5, ICTManager: 6, Procurement: 7 };
 const DIVISIONS = [
   'Admin', 'Geo-Hazards', 'ICT_Engineering', 'Climate', 'Observations', 'Forecast'
 ];
@@ -21,8 +21,9 @@ async function seed() {
 
     await client.query(`
       INSERT INTO roles (id, role_name) VALUES
-        (1, 'Staff'), (2, 'PSO'), (3, 'Manager'), (4, 'Director'), (5, 'Admin')
-      ON CONFLICT (role_name) DO NOTHING
+        (1, 'Staff'), (2, 'PSO'), (3, 'Manager'), (4, 'Director'), (5, 'Admin'),
+        (6, 'ICT Manager'), (7, 'Procurement Officer')
+      ON CONFLICT (id) DO UPDATE SET role_name = EXCLUDED.role_name
     `);
 
     const hash = await bcrypt.hash('Admin123!', 10);
@@ -49,7 +50,7 @@ async function seed() {
     }
 
     await client.query('COMMIT');
-    console.log('Seed completed. Default admin: login with admin or admin@vmgd.gov.vu / Admin123!');
+    console.log('LPODesk seed completed. Default admin: login with admin or admin@vmgd.gov.vu / Admin123!');
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Seed failed:', err);

@@ -1,16 +1,16 @@
 {
-  "name": "vmgd-leave-backend",
+  "name": "vmgd-lpodesk-backend",
   "version": "1.0.0",
-  "description": "VMGD Online Leave System - Backend",
+  "description": "LPODesk - Local Purchase Order Request Workflow - Backend",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "db:migrate": "node src/db/migrate.js",
-    "db:migrate:leave-balances": "node src/db/migrate-leave-balances.js",
+    "db:migrate:lpo": "node src/db/migrate-lpo.js",
+    "db:migrate:request-fields": "node src/db/migrate-request-fields.js",
     "db:seed": "node src/db/seed.js",
-    "db:add-username": "node src/db/migrate-username.js",
     "test:smtp": "node src/scripts/testSmtp.js"
   },
   "dependencies": {
@@ -20,6 +20,7 @@
     "express": "^4.21.0",
     "jsonwebtoken": "^9.0.2",
     "ldapjs": "^3.0.7",
+    "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.14",
     "pg": "^8.12.0"
   }
